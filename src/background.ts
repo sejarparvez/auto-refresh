@@ -5,7 +5,12 @@ import type { Message, TabState } from "./types";
 initLogger();
 
 export function isMessage(msg: unknown): msg is Message {
-	return typeof msg === "object" && msg !== null && "action" in msg;
+	if (typeof msg !== "object" || msg === null || !("action" in msg)) return false;
+	const m = msg as Record<string, unknown>;
+	if (m.action === "start") return typeof m.interval === "number" && typeof m.tabId === "number";
+	if (m.action === "stop" || m.action === "pause" || m.action === "resume")
+		return typeof m.tabId === "number";
+	return false;
 }
 
 const MIN_INTERVAL = 60;
@@ -81,18 +86,25 @@ export function handleMessage(msg: unknown): Promise<{ actualInterval: number }>
 				// Persist — includes tabState.randomize so handleAlarm can read it
 				browser.storage.local
 					.set(toStorageState(status, defaultInterval, data.tabStates))
-					.catch(() => {});
+					.catch((err) => console.warn("[AutoRefresh]", err));
 
 				browser.action.setBadgeText({ text: "ON", tabId });
 				browser.action.setBadgeBackgroundColor({ color: "#16a34a" });
-				browser.tabs.sendMessage(tabId, { showCountdown: actualInterval }).catch(() => {});
+				browser.tabs
+					.sendMessage(tabId, { showCountdown: actualInterval })
+					.catch((err) => console.warn("[AutoRefresh]", err));
 
 				// Await alarm creation so errors propagate
-				await scheduleAlarm(alarmName, actualInterval, randomize).catch(() => {});
+				await scheduleAlarm(alarmName, actualInterval, randomize).catch((err) =>
+					console.warn("[AutoRefresh]", err),
+				);
 
 				return { actualInterval };
 			})
-			.catch(() => ({ actualInterval: clampedInterval }));
+			.catch((err) => {
+				console.warn("[AutoRefresh]", err);
+				return { actualInterval: clampedInterval };
+			});
 	}
 
 	if (msg.action === "stop") {
@@ -100,7 +112,9 @@ export function handleMessage(msg: unknown): Promise<{ actualInterval: number }>
 		log("Stopping auto-refresh for tab:", tabId);
 
 		browser.action.setBadgeText({ text: "", tabId });
-		browser.tabs.sendMessage(tabId, { hideCountdown: true }).catch(() => {});
+		browser.tabs
+			.sendMessage(tabId, { hideCountdown: true })
+			.catch((err) => console.warn("[AutoRefresh]", err));
 		browser.alarms.clear(getAlarmName(tabId));
 
 		browser.storage.local
@@ -109,9 +123,11 @@ export function handleMessage(msg: unknown): Promise<{ actualInterval: number }>
 				const tabStates: Record<number, TabState> = { ...(data.tabStates || {}) };
 				delete tabStates[tabId];
 				const hasActive = Object.values(tabStates).some((s) => !s.paused);
-				browser.storage.local.set({ active: hasActive, tabStates }).catch(() => {});
+				browser.storage.local
+					.set({ active: hasActive, tabStates })
+					.catch((err) => console.warn("[AutoRefresh]", err));
 			})
-			.catch(() => {});
+			.catch((err) => console.warn("[AutoRefresh]", err));
 	}
 }
 
@@ -149,15 +165,21 @@ export function handleAlarm(alarm: browser.alarms.Alarm): void {
 						tabStates[tabId].count = newCount;
 						tabStates[tabId].actualInterval = nextInterval;
 					}
-					browser.storage.local.set({ tabStates }).catch(() => {});
+					browser.storage.local
+						.set({ tabStates })
+						.catch((err) => console.warn("[AutoRefresh]", err));
 
 					// Send next countdown to content script overlay
-					browser.tabs.sendMessage(tabId, { showCountdown: nextInterval }).catch(() => {});
+					browser.tabs
+						.sendMessage(tabId, { showCountdown: nextInterval })
+						.catch((err) => console.warn("[AutoRefresh]", err));
 
 					// Fixed alarms repeat automatically via periodInMinutes.
 					// Randomized alarms are one-shot — schedule the next one now.
 					if (randomize) {
-						scheduleAlarm(alarm.name, nextInterval, true).catch(() => {});
+						scheduleAlarm(alarm.name, nextInterval, true).catch((err) =>
+							console.warn("[AutoRefresh]", err),
+						);
 					}
 				})
 				.catch((err) => {
@@ -169,13 +191,17 @@ export function handleAlarm(alarm: browser.alarms.Alarm): void {
 							const tabStates: Record<number, TabState> = { ...(d.tabStates || {}) };
 							delete tabStates[tabId];
 							const hasActive = Object.values(tabStates).some((s) => !s.paused);
-							browser.storage.local.set({ active: hasActive, tabStates }).catch(() => {});
+							browser.storage.local
+								.set({ active: hasActive, tabStates })
+								.catch((err) => console.warn("[AutoRefresh]", err));
 						})
-						.catch(() => {});
-					browser.action.setBadgeText({ text: "", tabId }).catch(() => {});
+						.catch((err) => console.warn("[AutoRefresh]", err));
+					browser.action
+						.setBadgeText({ text: "", tabId })
+						.catch((err) => console.warn("[AutoRefresh]", err));
 				});
 		})
-		.catch(() => {});
+		.catch((err) => console.warn("[AutoRefresh]", err));
 }
 
 browser.runtime.onMessage.addListener(handleMessage);
@@ -189,7 +215,9 @@ export async function handleStartup(): Promise<void> {
 			await browser.alarms.clear(alarm.name);
 		}
 	}
-	await browser.storage.local.set({ active: false }).catch(() => {});
+	await browser.storage.local
+		.set({ active: false })
+		.catch((err) => console.warn("[AutoRefresh]", err));
 }
 
 browser.runtime.onStartup.addListener(handleStartup);
@@ -199,7 +227,8 @@ browser.commands.onCommand.addListener((command) => {
 	browser.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
 		if (!tab?.id) return;
 		browser.storage.local.get(["tabStates", "defaultInterval", "randomize"]).then((data) => {
-			const isActive = data.active === true && data.currentTabId === tab.id;
+			const isActive =
+				data.active === true && tab.id !== undefined && tab.id in (data.tabStates ?? {});
 			if (isActive) {
 				handleMessage({ action: "stop", tabId: tab.id });
 			} else {

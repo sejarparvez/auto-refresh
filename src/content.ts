@@ -1,4 +1,6 @@
-import { log } from "./logger";
+import { initLogger, log } from "./logger";
+
+await initLogger();
 
 let overlay: HTMLDivElement | null = null;
 let countdownValue: HTMLSpanElement | null = null;

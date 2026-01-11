@@ -1,4 +1,15 @@
 import type { StorageState, TabState } from "./types";
+import {
+	CIRC,
+	MAX_INTERVAL,
+	MIN_INTERVAL,
+	STEP,
+	computeRingOffset,
+	formatInterval,
+	formatRemaining,
+	snapInterval,
+	truncateTitle,
+} from "./utils";
 
 const toggleWrap = document.getElementById("toggleWrap") as HTMLDivElement;
 const toggleTrack = document.getElementById("toggleTrack") as HTMLDivElement;
@@ -18,11 +29,6 @@ const stepUp = document.getElementById("stepUp") as HTMLButtonElement;
 const timeMins = document.getElementById("timeMins") as HTMLSpanElement;
 const timeSecs = document.getElementById("timeSecs") as HTMLSpanElement;
 
-const CIRC = 175.9;
-const MIN_INTERVAL = 60;
-const MAX_INTERVAL = 7200; // 2 hours
-const STEP = 30;
-
 let active = false;
 let interval = MIN_INTERVAL;
 let remaining = MIN_INTERVAL;
@@ -32,32 +38,6 @@ let currentTabId: number | null = null;
 let timer: ReturnType<typeof setInterval> | null = null;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-export function truncateTitle(title: string, maxLength = 30): string {
-	if (title.length <= maxLength) return title;
-	return `${title.slice(0, maxLength)}...`;
-}
-
-export function formatInterval(secs: number): string {
-	if (secs >= 3600) {
-		const h = Math.floor(secs / 3600);
-		const m = Math.floor((secs % 3600) / 60);
-		return m > 0 ? `${h}h ${m}m` : `${h}h`;
-	}
-	if (secs >= 60) return `${Math.round(secs / 60)}m`;
-	return `${secs}s`;
-}
-
-export function formatRemaining(secs: number): string {
-	if (secs >= 60) return `${Math.floor(secs / 60)}m ${secs % 60}s`;
-	return `${secs}s`;
-}
-
-/** Snap a raw value to the nearest 30s step, clamped to [MIN, MAX]. */
-export function snapInterval(raw: number): number {
-	const snapped = Math.round(raw / STEP) * STEP;
-	return Math.max(MIN_INTERVAL, Math.min(MAX_INTERVAL, snapped));
-}
 
 function updateTimeDisplay(secs: number) {
 	const m = Math.floor(secs / 60);
@@ -83,8 +63,7 @@ function syncPresets() {
 // ─── Ring ─────────────────────────────────────────────────────────────────────
 
 function setRing(rem: number, total: number) {
-	const pct = total > 0 ? Math.min(1, rem / total) : 0;
-	progressArc.setAttribute("stroke-dashoffset", (CIRC * (1 - pct)).toFixed(1));
+	progressArc.setAttribute("stroke-dashoffset", computeRingOffset(rem, total));
 	ringNum.textContent = active ? formatRemaining(rem) : "—";
 	statNext.textContent = active ? formatRemaining(rem) : "—";
 }
@@ -158,7 +137,7 @@ function startTimer() {
 									}
 								}
 							})
-							.catch(() => {});
+							.catch((err) => console.warn("[AutoRefresh]", err));
 
 						resetAndStartTimer(newRemaining, newTotal);
 					} else {
@@ -222,8 +201,8 @@ async function startRefresh(tabId: number, tabTitle?: string) {
 		})) as { actualInterval: number } | undefined;
 
 		if (response?.actualInterval) actualInterval = response.actualInterval;
-	} catch {
-		/* background cold-start — fall back to base interval */
+	} catch (err) {
+		console.warn("[AutoRefresh]", err);
 	}
 
 	totalInterval = actualInterval;
@@ -231,22 +210,6 @@ async function startRefresh(tabId: number, tabTitle?: string) {
 	hSub.textContent = `every ${formatInterval(actualInterval)}`;
 	tabBadge.textContent = `on · ${formatInterval(actualInterval)}`;
 	startTimer();
-
-	try {
-		const data = await browser.storage.local.get("tabStates");
-		const tabStates: Record<number, TabState> = { ...(data.tabStates || {}) };
-		tabStates[tabId] = {
-			interval,
-			count,
-			paused: false,
-			remaining: null,
-			randomize: randomizeToggle.checked,
-			actualInterval: totalInterval,
-		};
-		await browser.storage.local.set({ active: true, currentTabId: tabId, tabStates });
-	} catch {
-		/* non-fatal */
-	}
 }
 
 function stopRefresh() {
@@ -256,16 +219,12 @@ function stopRefresh() {
 	setActiveUI(false);
 
 	if (oldTabId !== null) {
-		browser.action.setBadgeText({ text: "", tabId: oldTabId }).catch(() => {});
-		browser.runtime.sendMessage({ action: "stop", tabId: oldTabId }).catch(() => {});
-		browser.storage.local
-			.get("tabStates")
-			.then((data) => {
-				const tabStates: Record<number, TabState> = { ...(data.tabStates || {}) };
-				delete tabStates[oldTabId];
-				browser.storage.local.set({ active: false, currentTabId: null, tabStates }).catch(() => {});
-			})
-			.catch(() => {});
+		browser.action
+			.setBadgeText({ text: "", tabId: oldTabId })
+			.catch((err) => console.warn("[AutoRefresh]", err));
+		browser.runtime
+			.sendMessage({ action: "stop", tabId: oldTabId })
+			.catch((err) => console.warn("[AutoRefresh]", err));
 	}
 }
 
@@ -285,8 +244,8 @@ async function applyInterval(val: number) {
 				randomize: randomizeToggle.checked,
 			})) as { actualInterval: number } | undefined;
 			if (response?.actualInterval) actualInterval = response.actualInterval;
-		} catch {
-			/* ignore */
+		} catch (err) {
+			console.warn("[AutoRefresh]", err);
 		}
 
 		totalInterval = actualInterval;
@@ -322,7 +281,7 @@ stepUp.addEventListener("click", () => applyInterval(interval + STEP));
 // Randomize toggle
 randomizeToggle.addEventListener("change", async () => {
 	const randomize = randomizeToggle.checked;
-	browser.storage.local.set({ randomize }).catch(() => {});
+	browser.storage.local.set({ randomize }).catch((err) => console.warn("[AutoRefresh]", err));
 
 	if (active && currentTabId !== null) {
 		let actualInterval = interval;
@@ -334,8 +293,8 @@ randomizeToggle.addEventListener("change", async () => {
 				randomize,
 			})) as { actualInterval: number } | undefined;
 			if (response?.actualInterval) actualInterval = response.actualInterval;
-		} catch {
-			/* ignore */
+		} catch (err) {
+			console.warn("[AutoRefresh]", err);
 		}
 
 		totalInterval = actualInterval;
@@ -396,7 +355,10 @@ randomizeToggle.addEventListener("change", async () => {
 		statInterval.textContent = formatInterval(interval);
 		updateActionButton();
 
-		const alarm = await browser.alarms.get(`autoRefresh-${tabId}`).catch(() => undefined);
+		const alarm = await browser.alarms.get(`autoRefresh-${tabId}`).catch((err) => {
+			console.warn("[AutoRefresh]", err);
+			return undefined;
+		});
 
 		if (alarm) {
 			const ms = alarm.scheduledTime - Date.now();

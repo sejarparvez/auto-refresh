@@ -100,6 +100,26 @@ describe("isMessage", () => {
 		expect(isMessage({ action: "resume", tabId: 5 })).toBe(true);
 	});
 
+	test("rejects start message missing interval", async () => {
+		const { isMessage } = await import("../background");
+		expect(isMessage({ action: "start", tabId: 1 })).toBe(false);
+	});
+
+	test("rejects start message missing tabId", async () => {
+		const { isMessage } = await import("../background");
+		expect(isMessage({ action: "start", interval: 60 })).toBe(false);
+	});
+
+	test("rejects stop message missing tabId", async () => {
+		const { isMessage } = await import("../background");
+		expect(isMessage({ action: "stop" })).toBe(false);
+	});
+
+	test("rejects unknown action", async () => {
+		const { isMessage } = await import("../background");
+		expect(isMessage({ action: "unknown", tabId: 1 })).toBe(false);
+	});
+
 	test("null/undefined/primitives", async () => {
 		const { isMessage } = await import("../background");
 		expect(isMessage(null)).toBe(false);
