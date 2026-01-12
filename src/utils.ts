@@ -32,3 +32,14 @@ export function computeRingOffset(rem: number, total: number): string {
 	const pct = total > 0 ? Math.min(1, rem / total) : 0;
 	return (CIRC * (1 - pct)).toFixed(1);
 }
+
+export function debounce<A extends unknown[]>(
+	fn: (...args: A) => unknown,
+	ms: number,
+): (...args: A) => void {
+	let timer: ReturnType<typeof setTimeout> | null = null;
+	return ((...args: A) => {
+		if (timer) clearTimeout(timer);
+		timer = setTimeout(() => fn(...args), ms);
+	}) as (...args: A) => void;
+}

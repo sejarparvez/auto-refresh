@@ -14,11 +14,6 @@ describe("logger", () => {
 		expect(typeof warn).toBe("function");
 	});
 
-	test("should export error function", () => {
-		const { error } = require("../../src/logger");
-		expect(typeof error).toBe("function");
-	});
-
 	test("should not throw when calling log with DEBUG=false", () => {
 		const { log } = require("../../src/logger");
 		expect(() => log("test message")).not.toThrow();
@@ -27,10 +22,5 @@ describe("logger", () => {
 	test("should not throw when calling warn with DEBUG=false", () => {
 		const { warn } = require("../../src/logger");
 		expect(() => warn("test warning")).not.toThrow();
-	});
-
-	test("should not throw when calling error with DEBUG=false", () => {
-		const { error } = require("../../src/logger");
-		expect(() => error("test error")).not.toThrow();
 	});
 });

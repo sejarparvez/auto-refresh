@@ -5,6 +5,7 @@ import {
 	MIN_INTERVAL,
 	STEP,
 	computeRingOffset,
+	debounce,
 	formatInterval,
 	formatRemaining,
 	snapInterval,
@@ -30,6 +31,7 @@ const timeMins = document.getElementById("timeMins") as HTMLSpanElement;
 const timeSecs = document.getElementById("timeSecs") as HTMLSpanElement;
 
 let active = false;
+let paused = false;
 let interval = MIN_INTERVAL;
 let remaining = MIN_INTERVAL;
 let totalInterval = MIN_INTERVAL;
@@ -166,12 +168,21 @@ function startTimer() {
 // ─── UI state ─────────────────────────────────────────────────────────────────
 
 function updateActionButton() {
-	actionBtn.textContent = active ? "Stop refreshing" : "Start refreshing";
-	actionBtn.className = active ? "action-btn stop" : "action-btn";
+	if (active && paused) {
+		actionBtn.textContent = "Resume";
+		actionBtn.className = "action-btn";
+	} else if (active) {
+		actionBtn.textContent = "Pause";
+		actionBtn.className = "action-btn";
+	} else {
+		actionBtn.textContent = "Start refreshing";
+		actionBtn.className = "action-btn";
+	}
 }
 
 function setActiveUI(on: boolean, actualSecs?: number) {
 	active = on;
+	if (!on) paused = false;
 	toggleTrack.classList.toggle("on", on);
 	statusDot.classList.toggle("on", on);
 	const displayInterval = actualSecs ?? interval;
@@ -186,6 +197,7 @@ function setActiveUI(on: boolean, actualSecs?: number) {
 // ─── Start / Stop ─────────────────────────────────────────────────────────────
 
 async function startRefresh(tabId: number, tabTitle?: string) {
+	paused = false;
 	currentTabId = tabId;
 	if (tabTitle) tabName.textContent = truncateTitle(tabTitle);
 
@@ -254,6 +266,58 @@ async function applyInterval(val: number) {
 	}
 }
 
+// ─── Pause / Resume ──────────────────────────────────────────────────────────
+
+async function togglePause() {
+	if (!active) {
+		const tabs = await browser.tabs.query({ active: true, currentWindow: true });
+		const tab = tabs[0];
+		if (tab?.id !== undefined) await startRefresh(tab.id, tab.title);
+		return;
+	}
+
+	const tabId = currentTabId;
+	if (tabId === null) return;
+
+	if (paused) {
+		try {
+			const response = (await browser.runtime.sendMessage({
+				action: "resume",
+				tabId,
+			})) as { actualInterval: number } | undefined;
+
+			paused = false;
+			if (response?.actualInterval) {
+				totalInterval = response.actualInterval;
+			}
+			startTimer();
+			updateActionButton();
+		} catch (err) {
+			console.warn("[AutoRefresh]", err);
+		}
+	} else {
+		try {
+			const response = (await browser.runtime.sendMessage({
+				action: "pause",
+				tabId,
+			})) as { remaining: number } | undefined;
+
+			paused = true;
+			if (response?.remaining) {
+				remaining = response.remaining;
+			}
+			if (timer) {
+				clearInterval(timer);
+				timer = null;
+			}
+			setRing(remaining, totalInterval);
+			updateActionButton();
+		} catch (err) {
+			console.warn("[AutoRefresh]", err);
+		}
+	}
+}
+
 // ─── Event listeners ──────────────────────────────────────────────────────────
 
 async function handleToggle() {
@@ -267,7 +331,7 @@ async function handleToggle() {
 }
 
 toggleWrap.addEventListener("click", handleToggle);
-actionBtn.addEventListener("click", handleToggle);
+actionBtn.addEventListener("click", togglePause);
 
 // Preset buttons
 for (const b of document.querySelectorAll<HTMLButtonElement>(".p-btn")) {
@@ -275,8 +339,9 @@ for (const b of document.querySelectorAll<HTMLButtonElement>(".p-btn")) {
 }
 
 // Stepper buttons — step by 30s, clamped by applyInterval → snapInterval
-stepDown.addEventListener("click", () => applyInterval(interval - STEP));
-stepUp.addEventListener("click", () => applyInterval(interval + STEP));
+const debouncedApply = debounce((val: number) => applyInterval(val), 100);
+stepDown.addEventListener("click", () => debouncedApply(interval - STEP));
+stepUp.addEventListener("click", () => debouncedApply(interval + STEP));
 
 // Randomize toggle
 randomizeToggle.addEventListener("change", async () => {
@@ -346,6 +411,7 @@ randomizeToggle.addEventListener("change", async () => {
 	if (isThisTabActive) {
 		currentTabId = tabId;
 		active = true;
+		paused = data.tabStates?.[tabId]?.paused ?? false;
 
 		toggleTrack.classList.add("on");
 		statusDot.classList.add("on");
@@ -355,24 +421,31 @@ randomizeToggle.addEventListener("change", async () => {
 		statInterval.textContent = formatInterval(interval);
 		updateActionButton();
 
-		const alarm = await browser.alarms.get(`autoRefresh-${tabId}`).catch((err) => {
-			console.warn("[AutoRefresh]", err);
-			return undefined;
-		});
-
-		if (alarm) {
-			const ms = alarm.scheduledTime - Date.now();
-			remaining = Math.max(1, Math.ceil(ms / 1000));
-			if (alarm.periodInMinutes) {
-				totalInterval = Math.round(alarm.periodInMinutes * 60);
-			}
+		if (paused) {
+			// biome-ignore lint/style/noNonNullAssertion: this is fine
+			remaining = data.tabStates![tabId].remaining ?? totalInterval;
+			setRing(remaining, totalInterval);
 		} else {
-			remaining = totalInterval;
-		}
+			const alarm = await browser.alarms.get(`autoRefresh-${tabId}`).catch((err) => {
+				console.warn("[AutoRefresh]", err);
+				return undefined;
+			});
 
-		startTimer();
+			if (alarm) {
+				const ms = alarm.scheduledTime - Date.now();
+				remaining = Math.max(1, Math.ceil(ms / 1000));
+				if (alarm.periodInMinutes) {
+					totalInterval = Math.round(alarm.periodInMinutes * 60);
+				}
+			} else {
+				remaining = totalInterval;
+			}
+
+			startTimer();
+		}
 	} else {
 		active = false;
+		paused = false;
 		currentTabId = null;
 		toggleTrack.classList.remove("on");
 		statusDot.classList.remove("on");
