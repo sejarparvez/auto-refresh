@@ -2,289 +2,7 @@
 <html>
   <head>
   <meta charset="utf-8">
-  <style>
-    @font-face {
-      font-family: 'Geist';
-      src: url('fonts/Geist/Geist-VariableFont_wght.ttf') format('truetype');
-      font-weight: 100 900;
-      font-style: normal;
-      font-display: swap;
-    }
-
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-    body {
-      width: 260px;
-      padding: 16px;
-      font-family: 'Geist', sans-serif;
-      background: var(--bg, #ffffff);
-      color: var(--tx, #111111);
-      display: flex;
-      flex-direction: column;
-      gap: 14px;
-    }
-
-    @media (prefers-color-scheme: dark) {
-      body {
-        --bg: #111111;
-        --tx: #f0f0f0;
-        --surface: #1c1c1c;
-        --surface2: #242424;
-        --border: #2a2a2a;
-        --border2: #333333;
-        --muted: #888;
-        --success: #4ade80;
-        --success-bg: rgba(74,222,128,0.12);
-        --success-border: rgba(74,222,128,0.2);
-        --danger: #f87171;
-        --danger-bg: rgba(248,113,113,0.08);
-        --danger-border: rgba(248,113,113,0.2);
-      }
-    }
-    @media (prefers-color-scheme: light) {
-      body {
-        --bg: #ffffff;
-        --tx: #111111;
-        --surface: #f5f5f5;
-        --surface2: #efefef;
-        --border: #e0e0e0;
-        --border2: #d0d0d0;
-        --muted: #999;
-        --success: #16a34a;
-        --success-bg: rgba(22,163,74,0.1);
-        --success-border: rgba(22,163,74,0.2);
-        --danger: #dc2626;
-        --danger-bg: rgba(220,38,38,0.04);
-        --danger-border: rgba(220,38,38,0.2);
-      }
-    }
-
-    /* ── Header ── */
-    .header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-    .header-left {
-      display: flex;
-      align-items: center;
-      gap: 9px;
-    }
-    .status-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: var(--border2);
-      flex-shrink: 0;
-      transition: background 0.3s;
-    }
-    .status-dot.on { background: var(--success); }
-    .h-title { font-size: 13px; font-weight: 600; color: var(--tx); }
-    .h-sub { font-size: 11px; color: var(--muted); margin-top: 1px; }
-
-    /* ── Main toggle ── */
-    .toggle-wrap { cursor: pointer; }
-    .toggle-track {
-      width: 40px; height: 22px;
-      border-radius: 11px;
-      background: var(--surface);
-      border: 1px solid var(--success-border);
-      position: relative;
-      transition: background 0.25s, border-color 0.25s;
-    }
-    .toggle-track.on { background: var(--success); border-color: var(--success); }
-    .toggle-thumb {
-      position: absolute;
-      top: 3px; left: 3px;
-      width: 16px; height: 16px;
-      border-radius: 50%;
-      background: var(--bg);
-      transition: transform 0.25s cubic-bezier(.4,0,.2,1);
-    }
-    .toggle-track.on .toggle-thumb { transform: translateX(18px); }
-
-    /* ── Divider ── */
-    .divider { height: 1px; background: var(--border); }
-
-    /* ── Ring + stats ── */
-    .ring-section { display: flex; align-items: center; gap: 14px; }
-    .ring-num { font-family: 'Geist', monospace; font-size: 14px; font-weight: 500; fill: var(--tx, #111); }
-    .ring-track { stroke: var(--border, #e0e0e0); }
-    .ring-progress { stroke: var(--success, #16a34a); transition: stroke-dashoffset 1s linear; }
-
-    .ring-stats { display: flex; flex-direction: column; gap: 6px; flex: 1; }
-    .stat-row { display: flex; align-items: baseline; justify-content: space-between; }
-    .stat-lbl { font-size: 11px; color: var(--muted); }
-    .stat-val { font-family: 'Geist', monospace; font-size: 13px; font-weight: 500; color: var(--tx); }
-
-    /* ── Section label ── */
-    .section-label {
-      font-size: 10px;
-      font-weight: 600;
-      letter-spacing: 0.6px;
-      text-transform: uppercase;
-      color: var(--muted);
-      margin-bottom: 7px;
-    }
-
-    /* ── Presets ── */
-    .presets { display: flex; flex-wrap: wrap; gap: 4px; }
-    .p-btn {
-      font-family: 'Geist', monospace;
-      font-size: 11px;
-      padding: 4px 8px;
-      border: 1px solid var(--success-border);
-      border-radius: 6px;
-      background: transparent;
-      color: var(--muted);
-      cursor: pointer;
-      transition: all 0.12s;
-    }
-    .p-btn:hover { border-color: var(--border2); color: var(--tx); }
-    .p-btn.active { background: var(--tx); color: var(--bg); border-color: var(--tx); }
-
-    /* ── Time stepper ── */
-    .stepper-wrap {
-      display: flex;
-      align-items: center;
-      margin-top: 8px;
-      border: 1px solid var(--success-border);
-      border-radius: 8px;
-      overflow: hidden;
-    }
-    .s-btn {
-      width: 36px; height: 34px;
-      background: var(--surface);
-      border: none;
-      color: var(--muted);
-      font-size: 18px;
-      cursor: pointer;
-      display: flex; align-items: center; justify-content: center;
-      transition: background 0.1s, color 0.1s;
-      flex-shrink: 0;
-      user-select: none;
-    }
-    .s-btn:hover { background: var(--surface2); color: var(--tx); }
-    .s-btn:active { transform: scale(0.93); }
-    .s-btn:disabled { opacity: 0.3; cursor: not-allowed; }
-
-    .time-display {
-      flex: 1;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 1px;
-      background: var(--bg);
-      border-left: 1px solid var(--border);
-      border-right: 1px solid var(--border);
-      height: 34px;
-      user-select: none;
-    }
-    .time-part {
-      font-family: 'Geist', monospace;
-      font-size: 15px;
-      font-weight: 500;
-      color: var(--tx);
-      min-width: 20px;
-      text-align: right;
-    }
-    .time-unit {
-      font-size: 11px;
-      color: var(--muted);
-      margin-right: 3px;
-    }
-
-    .stepper-hint {
-      font-size: 10px;
-      color: var(--muted);
-      text-align: center;
-      margin-top: 5px;
-    }
-
-    /* ── Tab row ── */
-    .tab-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 8px 10px;
-      background: var(--surface);
-      border-radius: 8px;
-    }
-    .tab-name {
-      font-size: 12px;
-      color: var(--tx);
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      max-width: 155px;
-    }
-    .tab-badge {
-      font-family: 'Geist', monospace;
-      font-size: 10px;
-      padding: 2px 7px;
-      border-radius: 20px;
-      background: var(--surface2);
-      color: var(--muted);
-      border: 1px solid var(--success-border);
-      flex-shrink: 0;
-    }
-    .tab-badge.on {
-      background: var(--success-bg);
-      color: var(--success);
-      border-color: var(--success-border);
-    }
-
-    /* ── Action button ── */
-    .action-btn {
-      width: 100%;
-      padding: 8px 0;
-      border: 1px solid var(--success-border);
-      border-radius: 8px;
-      font-family: 'Geist', sans-serif;
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.15s;
-      background: var(--success-bg);
-      color: var(--success);
-    }
-    .action-btn:hover { opacity: 0.8; }
-    .action-btn:active { transform: scale(0.97); }
-    .action-btn.stop {
-      border-color: var(--danger-border);
-      color: var(--danger);
-      background: var(--danger-bg);
-    }
-    .action-btn.stop:hover { background: rgba(220,38,38,0.08); }
-
-    /* ── Randomize row ── */
-    .randomize-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      font-size: 11px;
-      color: var(--muted);
-    }
-    .mini-toggle { position: relative; width: 32px; height: 18px; cursor: pointer; }
-    .mini-toggle input { opacity: 0; width: 0; height: 0; position: absolute; }
-    .mini-slider {
-      position: absolute; inset: 0;
-      background: var(--border);
-      border-radius: 9px;
-      transition: background 0.25s;
-    }
-    .mini-slider::before {
-      content: '';
-      position: absolute;
-      top: 2px; left: 2px;
-      width: 14px; height: 14px;
-      border-radius: 50%;
-      background: var(--bg);
-      transition: transform 0.25s;
-    }
-    input:checked + .mini-slider { background: var(--success); }
-    input:checked + .mini-slider::before { transform: translateX(14px); }
-  </style>
+  <style>*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}body{width:300px;padding:16px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen,Ubuntu,Cantarell,'Fira Sans','Droid Sans','Helvetica Neue',Arial,sans-serif;background:var(--bg,#ffffff);color:var(--tx,#111111);display:flex;flex-direction:column;gap:14px}@media (prefers-color-scheme:dark){body{--bg:#111111;--tx:#f0f0f0;--surface:#1c1c1c;--surface2:#242424;--border:#2a2a2a;--border2:#333333;--muted:#888;--success:#4ade80;--success-bg:rgba(74,222,128,0.12);--success-border:rgba(74,222,128,0.2);--danger:#f87171;--danger-bg:rgba(248,113,113,0.08);--danger-border:rgba(248,113,113,0.2)}}@media (prefers-color-scheme:light){body{--bg:#ffffff;--tx:#111111;--surface:#f5f5f5;--surface2:#efefef;--border:#e0e0e0;--border2:#d0d0d0;--muted:#999;--success:#16a34a;--success-bg:rgba(22,163,74,0.1);--success-border:rgba(22,163,74,0.2);--danger:#dc2626;--danger-bg:rgba(220,38,38,0.04);--danger-border:rgba(220,38,38,0.2)}}.header{display:flex;align-items:center;justify-content:space-between}.header-left{display:flex;align-items:center;gap:9px}.status-dot{width:8px;height:8px;border-radius:50%;background:var(--border2);flex-shrink:0;transition:background 0.3s}.status-dot.on{background:var(--success)}.h-title{font-size:13px;font-weight:600;color:var(--tx)}.h-sub{font-size:11px;color:var(--muted);margin-top:1px}.toggle-wrap{cursor:pointer}.toggle-track{width:40px;height:22px;border-radius:11px;background:var(--surface);border:1px solid var(--success-border);position:relative;transition:background 0.25s,border-color 0.25s}.toggle-track.on{background:var(--success);border-color:var(--success)}.toggle-thumb{position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:var(--bg);transition:transform 0.25s cubic-bezier(.4,0,.2,1)}.toggle-track.on .toggle-thumb{transform:translateX(18px)}.divider{height:1px;background:var(--border)}.ring-section{display:flex;align-items:center;gap:14px}.ring-num{font-family:'Geist',monospace;font-size:14px;font-weight:500;fill:var(--tx,#111)}.ring-track{stroke:var(--border,#e0e0e0)}.ring-progress{stroke:var(--success,#16a34a);transition:stroke-dashoffset 1s linear}.ring-stats{display:flex;flex-direction:column;gap:6px;flex:1}.stat-row{display:flex;align-items:baseline;justify-content:space-between}.stat-lbl{font-size:11px;color:var(--muted)}.stat-val{font-family:'Geist',monospace;font-size:13px;font-weight:500;color:var(--tx)}.section-label{font-size:10px;font-weight:600;letter-spacing:0.6px;text-transform:uppercase;color:var(--muted);margin-bottom:7px}.presets{display:flex;flex-wrap:wrap;gap:4px}.p-btn{font-family:'Geist',monospace;font-size:11px;padding:4px 8px;border:1px solid var(--success-border);border-radius:6px;background:transparent;color:var(--muted);cursor:pointer;transition:all 0.12s}.p-btn:hover{border-color:var(--border2);color:var(--tx)}.p-btn.active{background:var(--tx);color:var(--bg);border-color:var(--tx)}.stepper-wrap{display:flex;align-items:center;margin-top:8px;border:1px solid var(--success-border);border-radius:8px;overflow:hidden}.s-btn{width:36px;height:34px;background:var(--surface);border:none;color:var(--muted);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background 0.1s,color 0.1s;flex-shrink:0;user-select:none}.s-btn:hover{background:var(--surface2);color:var(--tx)}.s-btn:active{transform:scale(0.93)}.s-btn:disabled{opacity:0.3;cursor:not-allowed}.time-display{flex:1;display:flex;align-items:center;justify-content:center;gap:1px;background:var(--bg);border-left:1px solid var(--border);border-right:1px solid var(--border);height:34px;user-select:none}.time-part{font-family:'Geist',monospace;font-size:15px;font-weight:500;color:var(--tx);min-width:20px;text-align:right}.time-unit{font-size:11px;color:var(--muted);margin-right:3px}.stepper-hint{font-size:10px;color:var(--muted);text-align:center;margin-top:5px}.tab-row{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:var(--surface);border-radius:8px}.tab-name{font-size:12px;color:var(--tx);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:155px}.tab-badge{font-family:'Geist',monospace;font-size:10px;padding:2px 7px;border-radius:20px;background:var(--surface2);color:var(--muted);border:1px solid var(--success-border);flex-shrink:0}.tab-badge.on{background:var(--success-bg);color:var(--success);border-color:var(--success-border)}.action-btn{width:100%;padding:8px 0;border:1px solid var(--success-border);border-radius:8px;font-family:'Geist',sans-serif;font-size:13px;font-weight:600;cursor:pointer;transition:all 0.15s;background:var(--success-bg);color:var(--success)}.action-btn:hover{opacity:0.8}.action-btn:active{transform:scale(0.97)}.action-btn.stop{border-color:var(--danger-border);color:var(--danger);background:var(--danger-bg)}.action-btn.stop:hover{background:rgba(220,38,38,0.08)}.randomize-row{display:flex;align-items:center;justify-content:space-between;font-size:11px;color:var(--muted)}.mini-toggle{position:relative;width:32px;height:18px;cursor:pointer}.mini-toggle input{opacity:0;width:0;height:0;position:absolute}.mini-slider{position:absolute;inset:0;background:var(--border);border-radius:9px;transition:background 0.25s}.mini-slider::before{content:'';position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:var(--bg);transition:transform 0.25s}input:checked + .mini-slider{background:var(--success)}input:checked + .mini-slider::before{transform:translateX(14px)}.limit-input{width:48px;font-family:'Geist',monospace;font-size:12px;font-weight:500;background:var(--surface);color:var(--tx);border:1px solid var(--border);border-radius:4px;padding:1px 4px;text-align:center;outline:none}.limit-input:focus{border-color:var(--success)}.limit-input::placeholder{color:var(--muted)}.reset-btn{background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;padding:0 2px;line-height:1;transition:color .15s}.reset-btn:hover{color:var(--tx)}body.restoring .stat-row,body.restoring .ring-section{opacity:.35;transition:opacity .15s}body.restoring .header .h-title{opacity:.35}body.restoring .toggle-wrap{opacity:.35}body:not(.restoring) .stat-row,body:not(.restoring) .ring-section,body:not(.restoring) .header .h-title,body:not(.restoring) .toggle-wrap{opacity:1;transition:opacity .15s}.status-dot{display:flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:var(--border2);flex-shrink:0;transition:background .3s;font-size:10px;line-height:1}.status-dot.on{background:var(--success)}.status-dot::after{content:"○";color:#fff}.status-dot.on::after{content:"●"}.tab-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0}.tab-badge{flex-shrink:0}.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}</style>
 </head>
 <body>
 
@@ -297,7 +15,7 @@
         <div class="h-sub" id="hSub">inactive</div>
       </div>
     </div>
-    <div class="toggle-wrap" id="toggleWrap">
+    <div class="toggle-wrap" id="toggleWrap" role="switch" aria-checked="false" tabindex="0">
       <div class="toggle-track" id="toggleTrack">
         <div class="toggle-thumb"></div>
       </div>
@@ -316,6 +34,7 @@
         transform="rotate(-90 36 36)"/>
       <text id="ringNum" class="ring-num" x="36" y="40" text-anchor="middle">—</text>
     </svg>
+    <div id="countdownAnnounce" class="sr-only" aria-live="polite" aria-atomic="true"></div>
     <div class="ring-stats">
       <div class="stat-row">
         <span class="stat-lbl">interval</span>
@@ -323,7 +42,13 @@
       </div>
       <div class="stat-row">
         <span class="stat-lbl">refreshed</span>
-        <span class="stat-val" id="statCount">0</span>
+        <span class="stat-val"><span id="statCount">0</span><button class="reset-btn" id="resetCountBtn" title="Reset count">↺</button></span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-lbl">limit</span>
+        <span class="stat-val">
+          <input type="number" id="maxRefreshesInput" class="limit-input" min="0" placeholder="∞" value="">
+        </span>
       </div>
       <div class="stat-row">
         <span class="stat-lbl">next in</span>
@@ -338,11 +63,11 @@
   <div>
     <div class="section-label">interval</div>
     <div class="presets" id="presets">
-      <button class="p-btn" data-v="60">1m</button>
-      <button class="p-btn" data-v="120">2m</button>
-      <button class="p-btn" data-v="300">5m</button>
-      <button class="p-btn" data-v="600">10m</button>
-      <button class="p-btn" data-v="900">15m</button>
+      <button class="p-btn" data-v="60" aria-label="1 minute">1m</button>
+      <button class="p-btn" data-v="120" aria-label="2 minutes">2m</button>
+      <button class="p-btn" data-v="300" aria-label="5 minutes">5m</button>
+      <button class="p-btn" data-v="600" aria-label="10 minutes">10m</button>
+      <button class="p-btn" data-v="900" aria-label="15 minutes">15m</button>
     </div>
     <div class="stepper-wrap">
       <button class="s-btn" id="stepDown" aria-label="Decrease interval">−</button>
@@ -361,6 +86,14 @@
       <span class="tab-name" id="tabName">current tab</span>
       <span class="tab-badge" id="tabBadge">off</span>
     </div>
+  </div>
+
+  <div class="randomize-row">
+    <span>Bypass cache</span>
+    <label class="mini-toggle">
+      <input type="checkbox" id="bypassCacheToggle">
+      <span class="mini-slider"></span>
+    </label>
   </div>
 
   <button class="action-btn" id="actionBtn">Start</button>

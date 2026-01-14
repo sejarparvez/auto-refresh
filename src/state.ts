@@ -10,6 +10,9 @@ export interface RefreshStatus {
 	remaining: number | null;
 	randomize: boolean;
 	actualInterval?: number;
+	url?: string | null;
+	maxRefreshes?: number | null;
+	bypassCache?: boolean;
 }
 
 export function isActive(status: RefreshStatus): boolean {
@@ -38,6 +41,9 @@ export function toStorageState(
 			paused: status.state === "PAUSED",
 			remaining: status.remaining,
 			randomize: status.randomize,
+			url: status.url ?? null,
+			maxRefreshes: status.maxRefreshes ?? null,
+			bypassCache: status.bypassCache ?? false,
 			...(status.actualInterval !== undefined ? { actualInterval: status.actualInterval } : {}),
 		};
 	}
@@ -76,6 +82,9 @@ export function fromStorage(data: Partial<StorageState>, tabId: number | null): 
 		remaining: tabState?.remaining ?? null,
 		randomize: tabState?.randomize ?? false,
 		actualInterval: tabState?.actualInterval,
+		url: tabState?.url ?? null,
+		maxRefreshes: tabState?.maxRefreshes ?? null,
+		bypassCache: tabState?.bypassCache ?? false,
 	};
 }
 

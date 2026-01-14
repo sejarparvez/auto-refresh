@@ -24,10 +24,15 @@ const mockAction = {
 const mockTabs = {
 	reload: mock(() => Promise.resolve()),
 	sendMessage: mock(() => Promise.resolve()),
+	get: mock(() => Promise.resolve({ id: 5, url: "https://example.com" })),
+	query: mock(() => Promise.resolve([])),
+	onUpdated: { addListener: mock() },
 };
 
 const mockRuntime = {
+	sendMessage: mock(() => Promise.resolve()),
 	onStartup: { addListener: mock() },
+	onInstalled: { addListener: mock() },
 	onMessage: { addListener: mock() },
 };
 
@@ -59,10 +64,15 @@ function clearAllMocks() {
 		mockAction.setBadgeBackgroundColor,
 		mockTabs.reload,
 		mockTabs.sendMessage,
+		mockTabs.get,
+		mockTabs.query,
+		mockRuntime.sendMessage,
 	]) {
 		m.mockClear();
 	}
 	mockTabs.reload.mockImplementation(() => Promise.resolve());
+	mockTabs.get.mockImplementation(() => Promise.resolve({ id: 5, url: "https://example.com" }));
+	mockTabs.query.mockImplementation(() => Promise.resolve([]));
 }
 
 beforeEach(() => {
@@ -188,7 +198,7 @@ describe("handleMessage — start", () => {
 		handleMessage({ action: "start", interval: 30, tabId: 1 });
 		await flush();
 		expect(mockAlarms.create).toHaveBeenCalledWith("autoRefresh-1", { periodInMinutes: 1 });
-		expect(mockAction.setBadgeText).toHaveBeenCalledWith({ text: "ON", tabId: 1 });
+		expect(mockAction.setBadgeText).toHaveBeenCalledWith({ text: "1m", tabId: 1 });
 	});
 
 	test("preserves interval >= 60", async () => {
@@ -389,7 +399,7 @@ describe("handleMessage — resume", () => {
 			delayInMinutes: 0.75,
 			periodInMinutes: 2,
 		});
-		expect(mockAction.setBadgeText).toHaveBeenCalledWith({ text: "ON", tabId: 5 });
+		expect(mockAction.setBadgeText).toHaveBeenCalledWith({ text: "2m", tabId: 5 });
 		expect(mockTabs.sendMessage).toHaveBeenCalledWith(5, { showCountdown: 45 });
 		expect(result).toHaveProperty("actualInterval", 120);
 
@@ -471,7 +481,7 @@ describe("handleAlarm", () => {
 		});
 		handleAlarm({ name: "autoRefresh-5", scheduledTime: Date.now(), periodInMinutes: 2 });
 		await flush();
-		expect(mockTabs.reload).toHaveBeenCalledWith(5);
+		expect(mockTabs.reload).toHaveBeenCalledWith(5, { bypassCache: false });
 	});
 
 	test("ignores non-autoRefresh alarms", async () => {
@@ -549,18 +559,59 @@ describe("handleAlarm — randomize integration", () => {
 // handleStartup
 // -------------------------------------------------------------------------
 describe("handleStartup", () => {
-	test("clears autoRefresh alarms and resets state", async () => {
-		mockAlarms.getAll.mockResolvedValue([
-			{ name: "autoRefresh-5", scheduledTime: Date.now(), periodInMinutes: 2 },
-			{ name: "autoRefresh-3", scheduledTime: Date.now(), periodInMinutes: 5 },
-			{ name: "otherAlarm", scheduledTime: Date.now(), periodInMinutes: 1 },
-		]);
+	test("re-attaches active tab states found by tabId", async () => {
+		mockTabs.query.mockResolvedValue([{ id: 5, url: "https://example.com" }]);
+		mockStorage.local.get.mockResolvedValue({
+			tabStates: {
+				5: {
+					interval: 120,
+					count: 3,
+					paused: false,
+					remaining: null,
+					randomize: false,
+					url: "https://example.com",
+				},
+			},
+			defaultInterval: 60,
+			randomize: false,
+		});
 		const { handleStartup } = await import("../background");
 		await handleStartup();
-		expect(mockAlarms.clear).toHaveBeenCalledTimes(2);
-		expect(mockAlarms.clear).toHaveBeenCalledWith("autoRefresh-5");
-		expect(mockAlarms.clear).toHaveBeenCalledWith("autoRefresh-3");
-		expect(mockAlarms.clearAll).not.toHaveBeenCalled();
+		expect(mockAlarms.create).toHaveBeenCalled();
+		expect(mockAction.setBadgeText).toHaveBeenCalledWith({ text: "2m", tabId: 5 });
+	});
+
+	test("cleans up tab states with no matching tab", async () => {
+		mockTabs.query.mockResolvedValue([]);
+		mockStorage.local.get.mockResolvedValue({
+			tabStates: {
+				5: {
+					interval: 120,
+					count: 3,
+					paused: false,
+					remaining: null,
+					randomize: false,
+					url: "https://old-url.com",
+				},
+			},
+			defaultInterval: 60,
+			randomize: false,
+		});
+		const { handleStartup } = await import("../background");
+		await handleStartup();
+		const storageSet = mockStorage.local.set.mock.calls[0][0];
+		expect(storageSet.active).toBe(false);
+		expect(storageSet.tabStates).toEqual({});
+	});
+
+	test("sets active:false when no tab states", async () => {
+		mockStorage.local.get.mockResolvedValue({
+			tabStates: {},
+			defaultInterval: 60,
+			randomize: false,
+		});
+		const { handleStartup } = await import("../background");
+		await handleStartup();
 		expect(mockStorage.local.set).toHaveBeenCalledWith({ active: false });
 	});
 });

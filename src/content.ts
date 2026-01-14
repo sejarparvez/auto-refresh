@@ -7,6 +7,13 @@ let countdownValue: HTMLSpanElement | null = null;
 let countdownInterval: ReturnType<typeof setInterval> | null = null;
 let stylesInjected = false;
 
+// Drag state
+let dragStartX = 0;
+let dragStartY = 0;
+let dragOffsetX = 0;
+let dragOffsetY = 0;
+let isDragging = false;
+
 const OVERLAY_CLASSES = "auto-refresh-overlay";
 const COUNTDOWN_CLASS = "auto-refresh-countdown";
 
@@ -29,7 +36,13 @@ function injectStyles(): void {
       display: flex;
       align-items: center;
       gap: 8px;
+      cursor: grab;
+      user-select: none;
       transition: opacity 0.3s;
+    }
+    .${OVERLAY_CLASSES}.dragging {
+      cursor: grabbing;
+      transition: none;
     }
     .${COUNTDOWN_CLASS} {
       font-weight: bold;
@@ -57,7 +70,41 @@ export function createOverlay(): HTMLDivElement {
 	secondsText.textContent = "s";
 	el.appendChild(secondsText);
 
+	makeDraggable(el);
+
 	return el;
+}
+
+function makeDraggable(el: HTMLDivElement): void {
+	el.addEventListener("mousedown", (e) => {
+		if (e.button !== 0) return;
+		isDragging = false;
+		dragStartX = e.clientX;
+		dragStartY = e.clientY;
+		el.classList.add("dragging");
+	});
+
+	document.addEventListener("mousemove", (e) => {
+		if (!el.classList.contains("dragging")) return;
+		const dx = e.clientX - dragStartX;
+		const dy = e.clientY - dragStartY;
+		if (!isDragging && (Math.abs(dx) > 3 || Math.abs(dy) > 3)) {
+			isDragging = true;
+		}
+		if (isDragging) {
+			dragOffsetX += dx;
+			dragOffsetY += dy;
+			el.style.transform = `translate(${dragOffsetX}px, ${dragOffsetY}px)`;
+		}
+		dragStartX = e.clientX;
+		dragStartY = e.clientY;
+	});
+
+	document.addEventListener("mouseup", () => {
+		if (!el.classList.contains("dragging")) return;
+		el.classList.remove("dragging");
+		isDragging = false;
+	});
 }
 
 export function showCountdown(initialSeconds: number) {

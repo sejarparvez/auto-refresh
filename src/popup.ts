@@ -9,7 +9,6 @@ import {
 	formatInterval,
 	formatRemaining,
 	snapInterval,
-	truncateTitle,
 } from "./utils";
 
 const toggleWrap = document.getElementById("toggleWrap") as HTMLDivElement;
@@ -24,7 +23,20 @@ const statNext = document.getElementById("statNext") as HTMLSpanElement;
 const tabName = document.getElementById("tabName") as HTMLSpanElement;
 const tabBadge = document.getElementById("tabBadge") as HTMLSpanElement;
 const actionBtn = document.getElementById("actionBtn") as HTMLButtonElement;
+const RESTRICTED_URL = [
+	"about:",
+	"view-source:",
+	"file://",
+	"moz-extension://",
+	"chrome:",
+	"data:",
+];
+
 const randomizeToggle = document.getElementById("randomizeToggle") as HTMLInputElement;
+const bypassCacheToggle = document.getElementById("bypassCacheToggle") as HTMLInputElement;
+const maxRefreshesInput = document.getElementById("maxRefreshesInput") as HTMLInputElement;
+const resetCountBtn = document.getElementById("resetCountBtn") as HTMLButtonElement;
+const countdownAnnounce = document.getElementById("countdownAnnounce") as HTMLDivElement;
 const stepDown = document.getElementById("stepDown") as HTMLButtonElement;
 const stepUp = document.getElementById("stepUp") as HTMLButtonElement;
 const timeMins = document.getElementById("timeMins") as HTMLSpanElement;
@@ -36,8 +48,31 @@ let interval = MIN_INTERVAL;
 let remaining = MIN_INTERVAL;
 let totalInterval = MIN_INTERVAL;
 let count = 0;
+let maxRefreshes: number | null = null;
 let currentTabId: number | null = null;
-let timer: ReturnType<typeof setInterval> | null = null;
+let timer: ReturnType<typeof setTimeout> | null = null;
+
+// ─── Listen for countdown updates from background ────────────────────────────
+
+browser.runtime.onMessage.addListener((msg: unknown) => {
+	if (typeof msg !== "object" || msg === null) return;
+	const update = msg as Record<string, unknown>;
+	if (update.type !== "countdownUpdate" || typeof update.tabId !== "number") return;
+	if (update.tabId !== currentTabId) return;
+
+	if (typeof update.count === "number") {
+		count = update.count;
+		statCount.textContent = String(count);
+	}
+	if (typeof update.actualInterval === "number") {
+		const actual = update.actualInterval;
+		hSub.textContent = `every ${formatInterval(actual)}`;
+		tabBadge.textContent = `on · ${formatInterval(actual)}`;
+	}
+	const tabMax = update.maxRefreshes;
+	maxRefreshes = typeof tabMax === "number" ? tabMax : null;
+	maxRefreshesInput.value = maxRefreshes !== null ? String(maxRefreshes) : "";
+});
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -66,15 +101,19 @@ function syncPresets() {
 
 function setRing(rem: number, total: number) {
 	progressArc.setAttribute("stroke-dashoffset", computeRingOffset(rem, total));
-	ringNum.textContent = active ? formatRemaining(rem) : "—";
-	statNext.textContent = active ? formatRemaining(rem) : "—";
+	const text = active ? formatRemaining(rem) : "—";
+	ringNum.textContent = text;
+	statNext.textContent = text;
+	if (active) {
+		countdownAnnounce.textContent = `Next refresh in ${text}`;
+	}
 }
 
 // ─── Timer ────────────────────────────────────────────────────────────────────
 
 function stopTimer() {
 	if (timer) {
-		clearInterval(timer);
+		clearTimeout(timer);
 		timer = null;
 	}
 	progressArc.setAttribute("stroke-dashoffset", String(CIRC));
@@ -89,22 +128,25 @@ function resetAndStartTimer(newRemaining: number, newTotal: number) {
 }
 
 function startTimer() {
-	if (timer) clearInterval(timer);
+	if (timer) clearTimeout(timer);
+	const startedAt = Date.now();
+	const startRemaining = remaining;
+	const startTotal = totalInterval;
 
-	setRing(remaining, totalInterval);
+	setRing(startRemaining, startTotal);
 
-	timer = setInterval(() => {
-		remaining -= 1;
+	function tick() {
+		const elapsed = Math.floor((Date.now() - startedAt) / 1000);
+		const currentRemaining = Math.max(0, startRemaining - elapsed);
 
-		if (remaining > 0) {
-			setRing(remaining, totalInterval);
+		if (currentRemaining > 0) {
+			setRing(currentRemaining, startTotal);
+			timer = setTimeout(tick, 1000);
 			return;
 		}
 
-		// biome-ignore lint/style/noNonNullAssertion: cleared immediately
-		clearInterval(timer!);
 		timer = null;
-		setRing(0, totalInterval);
+		setRing(0, startTotal);
 
 		if (currentTabId === null) return;
 
@@ -126,28 +168,13 @@ function startTimer() {
 							? Math.round(alarm.periodInMinutes * 60)
 							: newRemaining;
 
-						browser.storage.local
-							.get("tabStates")
-							.then((data) => {
-								if (currentTabId !== null && data.tabStates?.[currentTabId]) {
-									count = data.tabStates[currentTabId].count ?? count;
-									statCount.textContent = String(count);
-									const actual = data.tabStates[currentTabId].actualInterval;
-									if (actual) {
-										hSub.textContent = `every ${formatInterval(actual)}`;
-										tabBadge.textContent = `on · ${formatInterval(actual)}`;
-									}
-								}
-							})
-							.catch((err) => console.warn("[AutoRefresh]", err));
-
 						resetAndStartTimer(newRemaining, newTotal);
 					} else {
 						attempts += 1;
 						if (attempts < MAX_ATTEMPTS) {
 							setTimeout(tryGetAlarm, RETRY_MS);
 						} else {
-							resetAndStartTimer(totalInterval, totalInterval);
+							resetAndStartTimer(startTotal, startTotal);
 						}
 					}
 				})
@@ -156,13 +183,15 @@ function startTimer() {
 					if (attempts < MAX_ATTEMPTS) {
 						setTimeout(tryGetAlarm, RETRY_MS);
 					} else {
-						resetAndStartTimer(totalInterval, totalInterval);
+						resetAndStartTimer(startTotal, startTotal);
 					}
 				});
 		}
 
 		setTimeout(tryGetAlarm, 300);
-	}, 1000);
+	}
+
+	timer = setTimeout(tick, 1000);
 }
 
 // ─── UI state ─────────────────────────────────────────────────────────────────
@@ -183,8 +212,10 @@ function updateActionButton() {
 function setActiveUI(on: boolean, actualSecs?: number) {
 	active = on;
 	if (!on) paused = false;
+	toggleWrap.setAttribute("aria-checked", String(on));
 	toggleTrack.classList.toggle("on", on);
 	statusDot.classList.toggle("on", on);
+	statusDot.setAttribute("aria-label", on ? "Active" : "Inactive");
 	const displayInterval = actualSecs ?? interval;
 	hSub.textContent = on ? `every ${formatInterval(displayInterval)}` : "inactive";
 	tabBadge.textContent = on ? `on · ${formatInterval(displayInterval)}` : "off";
@@ -199,9 +230,21 @@ function setActiveUI(on: boolean, actualSecs?: number) {
 async function startRefresh(tabId: number, tabTitle?: string) {
 	paused = false;
 	currentTabId = tabId;
-	if (tabTitle) tabName.textContent = truncateTitle(tabTitle);
+	if (tabTitle) {
+		tabName.textContent = tabTitle;
+		tabName.title = tabTitle;
+	}
+
+	const tabUrl = (await browser.tabs.query({ active: true, currentWindow: true }))[0]?.url;
+	if (tabUrl && RESTRICTED_URL.some((p) => tabUrl.startsWith(p))) {
+		console.warn("[AutoRefresh] cannot start on restricted URL");
+		return;
+	}
 
 	setActiveUI(true);
+
+	const maxVal = maxRefreshesInput.value;
+	maxRefreshes = maxVal ? Number.parseInt(maxVal, 10) || null : null;
 
 	let actualInterval = interval;
 	try {
@@ -210,6 +253,8 @@ async function startRefresh(tabId: number, tabTitle?: string) {
 			interval,
 			tabId,
 			randomize: randomizeToggle.checked,
+			maxRefreshes,
+			bypassCache: bypassCacheToggle.checked,
 		})) as { actualInterval: number } | undefined;
 
 		if (response?.actualInterval) actualInterval = response.actualInterval;
@@ -247,6 +292,9 @@ async function applyInterval(val: number) {
 	syncPresets();
 
 	if (active && currentTabId !== null) {
+		const maxVal = maxRefreshesInput.value;
+		maxRefreshes = maxVal ? Number.parseInt(maxVal, 10) || null : null;
+
 		let actualInterval = interval;
 		try {
 			const response = (await browser.runtime.sendMessage({
@@ -254,6 +302,7 @@ async function applyInterval(val: number) {
 				interval,
 				tabId: currentTabId,
 				randomize: randomizeToggle.checked,
+				maxRefreshes,
 			})) as { actualInterval: number } | undefined;
 			if (response?.actualInterval) actualInterval = response.actualInterval;
 		} catch (err) {
@@ -349,6 +398,9 @@ randomizeToggle.addEventListener("change", async () => {
 	browser.storage.local.set({ randomize }).catch((err) => console.warn("[AutoRefresh]", err));
 
 	if (active && currentTabId !== null) {
+		const maxVal = maxRefreshesInput.value;
+		maxRefreshes = maxVal ? Number.parseInt(maxVal, 10) || null : null;
+
 		let actualInterval = interval;
 		try {
 			const response = (await browser.runtime.sendMessage({
@@ -356,6 +408,8 @@ randomizeToggle.addEventListener("change", async () => {
 				interval,
 				tabId: currentTabId,
 				randomize,
+				maxRefreshes,
+				bypassCache: bypassCacheToggle.checked,
 			})) as { actualInterval: number } | undefined;
 			if (response?.actualInterval) actualInterval = response.actualInterval;
 		} catch (err) {
@@ -368,6 +422,16 @@ randomizeToggle.addEventListener("change", async () => {
 	}
 });
 
+// ─── Reset count ──────────────────────────────────────────────────────────────
+
+resetCountBtn.addEventListener("click", () => {
+	if (currentTabId !== null) {
+		browser.runtime.sendMessage({ action: "resetCount", tabId: currentTabId }).catch(() => {});
+		count = 0;
+		statCount.textContent = "0";
+	}
+});
+
 // ─── Restore state on popup open ──────────────────────────────────────────────
 
 (async () => {
@@ -376,7 +440,10 @@ randomizeToggle.addEventListener("change", async () => {
 	if (!currentTab?.id) return;
 	const tabId: number = currentTab.id;
 
-	if (currentTab.title) tabName.textContent = truncateTitle(currentTab.title);
+	if (currentTab.title) {
+		tabName.textContent = currentTab.title;
+		tabName.title = currentTab.title;
+	}
 
 	type StorageData = Partial<StorageState> & {
 		defaultInterval?: number;
@@ -400,8 +467,21 @@ randomizeToggle.addEventListener("change", async () => {
 	count = data.tabStates?.[tabId]?.count ?? 0;
 	statCount.textContent = String(count);
 
+	maxRefreshes = data.tabStates?.[tabId]?.maxRefreshes ?? null;
+	maxRefreshesInput.value = maxRefreshes !== null ? String(maxRefreshes) : "";
+
 	if (typeof data.randomize === "boolean") {
 		randomizeToggle.checked = data.tabStates?.[tabId]?.randomize ?? data.randomize;
+	}
+
+	// Check for restricted URL
+	const tabUrl = currentTab?.url;
+	if (tabUrl && RESTRICTED_URL.some((p) => tabUrl.startsWith(p))) {
+		active = false;
+		paused = false;
+		currentTabId = null;
+		setActiveUI(false);
+		return;
 	}
 
 	syncPresets();
