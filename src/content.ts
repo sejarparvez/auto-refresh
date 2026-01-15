@@ -158,7 +158,8 @@ interface BackgroundMessage {
 	hideCountdown?: boolean;
 }
 
-browser.runtime.onMessage.addListener((msg: unknown) => {
+browser.runtime.onMessage.addListener((msg: unknown, sender) => {
+	if (sender.id !== browser.runtime.id) return;
 	if (typeof msg !== "object" || msg === null) return;
 
 	const message = msg as BackgroundMessage;

@@ -7,7 +7,19 @@ initLogger();
 export function isMessage(msg: unknown): msg is Message {
 	if (typeof msg !== "object" || msg === null || !("action" in msg)) return false;
 	const m = msg as Record<string, unknown>;
-	if (m.action === "start") return typeof m.interval === "number" && typeof m.tabId === "number";
+	if (m.action === "start") {
+		if (typeof m.interval !== "number" || typeof m.tabId !== "number") return false;
+		if (m.interval < MIN_INTERVAL || m.interval > MAX_INTERVAL) return false;
+		if (m.randomize !== undefined && typeof m.randomize !== "boolean") return false;
+		if (
+			m.maxRefreshes !== undefined &&
+			m.maxRefreshes !== null &&
+			typeof m.maxRefreshes !== "number"
+		)
+			return false;
+		if (m.bypassCache !== undefined && typeof m.bypassCache !== "boolean") return false;
+		return true;
+	}
 	if (
 		m.action === "stop" ||
 		m.action === "pause" ||
@@ -19,6 +31,7 @@ export function isMessage(msg: unknown): msg is Message {
 }
 
 const MIN_INTERVAL = 60;
+const MAX_INTERVAL = 7200;
 
 // Returns a jittered value within ±30% of base, never below MIN_INTERVAL.
 // With ±10% on a 60s base the swing is only ±6s and the lower half gets
@@ -382,7 +395,10 @@ export function handleAlarm(alarm: browser.alarms.Alarm): void {
 		.catch((err) => console.warn("[AutoRefresh]", err));
 }
 
-browser.runtime.onMessage.addListener((msg, _sender, _sendResponse) => handleMessage(msg));
+browser.runtime.onMessage.addListener((msg, sender, _sendResponse) => {
+	if (sender.id !== browser.runtime.id) return;
+	return handleMessage(msg);
+});
 browser.alarms.onAlarm.addListener(handleAlarm);
 
 export async function handleStartup(): Promise<void> {

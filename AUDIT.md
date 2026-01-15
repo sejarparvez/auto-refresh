@@ -7,38 +7,16 @@
 
 ## Table of Contents
 
-1. [🧮 Optimization Opportunities](#1--optimization-opportunities)
-2. [🔒 Security Analysis](#2--security-analysis)
-3. [🧪 Testing Gaps](#3--testing-gaps)
-4. [📚 README & Documentation Quality](#4--readme--documentation-quality)
-5. [🧠 Semi-Implemented Features](#5--semi-implemented-features)
-6. [🔗 Architecture Anti-Patterns](#6--architecture-anti-patterns)
-7. [📦 Bundle Size Analysis](#7--bundle-size-analysis)
-8. [🚀 Feature Backlog](#8--feature-backlog)
+1. [🧪 Testing Gaps](#1--testing-gaps)
+2. [📚 README & Documentation Quality](#2--readme--documentation-quality)
+3. [🧠 Semi-Implemented Features](#3--semi-implemented-features)
+4. [🔗 Architecture Anti-Patterns](#4--architecture-anti-patterns)
+5. [📦 Bundle Size Analysis](#5--bundle-size-analysis)
+6. [🚀 Feature Backlog](#6--feature-backlog)
 
 ---
 
-## 1. 🧮 Optimization Opportunities
-
-All items resolved. ✅
-
-- **O2** — `handleMessage` accepts optional `existingData` param; keyboard handler passes cached data
-- **O5** — Background pushes `{ type: "countdownUpdate" }` via `runtime.sendMessage` after each alarm fire; popup listener updates UI without storage reads
-
----
-
-## 2. 🔒 Security Analysis
-
-| Concern                            | Assessment                                                                                                                          |
-| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| **Message spoofing**               | Any extension could send `{action:"start", tabId:1, interval:1}` to flood-refresh a tab. Low risk — other extensions are sandboxed. |
-| **Content script style injection** | Injects `<style>` into page DOM — bypasses page CSP. Styles are hardcoded strings, not exploitable.                                 |
-| **Storage data**                   | All data is `browser.storage.local` (extension-scoped). Web pages cannot access it. ✅                                              |
-| **Permission surface**             | Only `tabs`, `alarms`, `storage` — narrowest possible for functionality. ✅                                                         |
-
----
-
-## 3. 🧪 Testing Gaps
+## 1. 🧪 Testing Gaps
 
 | File                 | Coverage | Issues                                                                                                 |
 | -------------------- | -------- | ------------------------------------------------------------------------------------------------------ |
@@ -53,7 +31,7 @@ All items resolved. ✅
 
 ---
 
-## 4. 📚 README & Documentation Quality
+## 2. 📚 README & Documentation Quality
 
 ### Still Missing from README.md
 
@@ -82,7 +60,7 @@ All items resolved. ✅
 
 ---
 
-## 5. 🧠 Semi-Implemented Features
+## 3. 🧠 Semi-Implemented Features
 
 These features are partially built but not finished:
 
@@ -93,7 +71,7 @@ These features are partially built but not finished:
 
 ---
 
-## 6. 🔗 Architecture Anti-Patterns
+## 4. 🔗 Architecture Anti-Patterns
 
 ### AP1 — Popup writes to storage directly
 
@@ -116,7 +94,7 @@ Popup maintains local `active`, `interval`, `remaining`, `totalInterval`, `count
 
 ---
 
-## 7. 📦 Bundle Size Analysis
+## 5. 📦 Bundle Size Analysis
 
 | Asset                                   | Size         | Notes               |
 | --------------------------------------- | ------------ | ------------------- |
@@ -127,7 +105,7 @@ Popup maintains local `active`, `interval`, `remaining`, `totalInterval`, `count
 
 ---
 
-## 8. 🚀 Feature Backlog
+## 6. 🚀 Feature Backlog
 
 ### High Value / Low Effort
 

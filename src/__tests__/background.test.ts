@@ -30,6 +30,7 @@ const mockTabs = {
 };
 
 const mockRuntime = {
+	id: "test-extension-id",
 	sendMessage: mock(() => Promise.resolve()),
 	onStartup: { addListener: mock() },
 	onInstalled: { addListener: mock() },
@@ -143,6 +144,50 @@ describe("isMessage", () => {
 		expect(isMessage({})).toBe(false);
 		expect(isMessage({ type: "start" })).toBe(false);
 	});
+
+	test("rejects start interval below MIN_INTERVAL", async () => {
+		const { isMessage } = await import("../background");
+		expect(isMessage({ action: "start", interval: 30, tabId: 1 })).toBe(false);
+	});
+
+	test("rejects start interval above MAX_INTERVAL", async () => {
+		const { isMessage } = await import("../background");
+		expect(isMessage({ action: "start", interval: 99999, tabId: 1 })).toBe(false);
+	});
+
+	test("accepts start with optional fields as booleans", async () => {
+		const { isMessage } = await import("../background");
+		expect(
+			isMessage({ action: "start", interval: 120, tabId: 1, randomize: true, bypassCache: false }),
+		).toBe(true);
+	});
+
+	test("rejects start with non-boolean randomize", async () => {
+		const { isMessage } = await import("../background");
+		expect(isMessage({ action: "start", interval: 120, tabId: 1, randomize: "yes" })).toBe(false);
+	});
+
+	test("accepts start with maxRefreshes as number", async () => {
+		const { isMessage } = await import("../background");
+		expect(isMessage({ action: "start", interval: 120, tabId: 1, maxRefreshes: 10 })).toBe(true);
+	});
+
+	test("accepts start with maxRefreshes as null", async () => {
+		const { isMessage } = await import("../background");
+		expect(isMessage({ action: "start", interval: 120, tabId: 1, maxRefreshes: null })).toBe(true);
+	});
+
+	test("rejects start with non-number maxRefreshes", async () => {
+		const { isMessage } = await import("../background");
+		expect(isMessage({ action: "start", interval: 120, tabId: 1, maxRefreshes: "unlimited" })).toBe(
+			false,
+		);
+	});
+
+	test("rejects start with non-boolean bypassCache", async () => {
+		const { isMessage } = await import("../background");
+		expect(isMessage({ action: "start", interval: 120, tabId: 1, bypassCache: 1 })).toBe(false);
+	});
 });
 
 // -------------------------------------------------------------------------
@@ -188,14 +233,14 @@ describe("jitteredInterval", () => {
 // handleMessage — start
 // -------------------------------------------------------------------------
 describe("handleMessage — start", () => {
-	test("clamps to 60s", async () => {
+	test("uses MIN_INTERVAL for minimum valid interval", async () => {
 		const { handleMessage } = await import("../background");
 		mockStorage.local.get.mockResolvedValue({
 			randomize: false,
 			tabStates: {},
 			defaultInterval: 60,
 		});
-		handleMessage({ action: "start", interval: 30, tabId: 1 });
+		handleMessage({ action: "start", interval: 60, tabId: 1 });
 		await flush();
 		expect(mockAlarms.create).toHaveBeenCalledWith("autoRefresh-1", { periodInMinutes: 1 });
 		expect(mockAction.setBadgeText).toHaveBeenCalledWith({ text: "1m", tabId: 1 });
