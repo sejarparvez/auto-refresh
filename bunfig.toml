@@ -2,5 +2,4 @@
 target = "browser"
 
 [test]
-# This injects document, window, HTMLElement, etc. into your test environment
-preload = ["happy-dom"]
+preload = ["./happydom.ts"]
