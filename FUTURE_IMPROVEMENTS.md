@@ -6,36 +6,6 @@ This file contains suggestions for further enhancing the Auto Refresh Tab Firefo
 
 
 
-## 🎨 Features & UX Enhancements (Pending)
-
-### Medium Value
-- [ ] **Per-tab intervals** - Remember different intervals for different tabs or domains
-- [ ] **URL pattern whitelist/blacklist** - Only auto-refresh on matching URLs
-
-### Nice to Have
-- [ ] **Notification on refresh** - Optional browser notification when a refresh happens (with toggle to enable/disable)
-- [ ] **Statistics page** - Track and display total refreshes, average interval, etc.
-- [ ] **Manual dark mode toggle** - Override system preference if users want to force light/dark theme
-
----
-
-## 🏗️ Code & Architecture Improvements
-
-- [ ] **Add a pre-build clean step** - Delete `dist/` before building to avoid stale files:
-  ```typescript
-  // In build.ts
-  await Bun.write("dist", null); // or use rmSync
-  ```
-- [ ] **Add a content script** - For more control (e.g., detect page load complete, inject CSS, show in-page countdown)
-- [ ] **State machine for refresh state** - Replace boolean `active` flag with proper states: `STARTING`, `ACTIVE`, `PAUSED`, `STOPPED`
-- [ ] **Debug/logger utility** - Optional verbose logging controlled by a debug flag:
-  ```typescript
-  const DEBUG = false;
-  function log(...args: unknown[]) { if (DEBUG) console.log(...args); }
-  ```
-
----
-
 ## 📦 Publishing to AMO (addons.mozilla.org)
 
 - [ ] **Add screenshots** - Take screenshots of the popup for the AMO listing
@@ -80,10 +50,9 @@ This file contains suggestions for further enhancing the Auto Refresh Tab Firefo
 ## 📊 Suggested Implementation Order
 
 1. **Add LICENSE file** (if open-sourcing)
-2. **Add unit tests** (improves code quality)
-3. **Per-tab intervals** (high user value)
-4. **URL pattern whitelist** (high user value)
-5. Other features as desired
+2. **Per-tab intervals** (high user value)
+3. **URL pattern whitelist** (high user value)
+4. Other features as desired
 
 ---
 

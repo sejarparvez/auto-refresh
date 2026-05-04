@@ -1,4 +1,4 @@
-import type { Message, StorageState } from "./types";
+import type { Message, StorageState, TabState } from "./types";
 
 const toggleWrap = document.getElementById("toggleWrap")!;
 const toggleTrack = document.getElementById("toggleTrack")!;
@@ -11,7 +11,9 @@ const statCount = document.getElementById("statCount")!;
 const tabName = document.getElementById("tabName")!;
 const tabBadge = document.getElementById("tabBadge")!;
 const actionBtn = document.getElementById("actionBtn") as HTMLButtonElement;
-const randomizeToggle = document.getElementById("randomizeToggle") as HTMLInputElement;
+const randomizeToggle = document.getElementById(
+	"randomizeToggle",
+) as HTMLInputElement;
 
 let paused = false;
 
@@ -36,14 +38,22 @@ function formatInterval(secs: number): string {
 
 function setRing(rem: number, total: number) {
 	const pct = total > 0 ? rem / total : 0;
-	progressArc.setAttribute("stroke-dashoffset", (CIRC * (1 - pct)).toFixed(1));
+	progressArc.setAttribute(
+		"stroke-dashoffset",
+		(CIRC * (1 - pct)).toFixed(1),
+	);
 	ringNum.textContent = active ? rem + "s" : "—";
 }
 
 function syncPresets() {
-	document.querySelectorAll<HTMLButtonElement>(".p-btn").forEach((b) => {
-		b.classList.toggle("active", parseInt(b.dataset.v!) === interval);
-	});
+	document
+		.querySelectorAll<HTMLButtonElement>(".p-btn")
+		.forEach((b) => {
+			b.classList.toggle(
+				"active",
+				parseInt(b.dataset.v!) === interval,
+			);
+		});
 	statInterval.textContent = formatInterval(interval);
 }
 
@@ -72,10 +82,14 @@ function startTimer() {
 			// Background handles the actual reload + count increment;
 			// we just reset the visual countdown here.
 			// Pull the latest count from storage to stay in sync.
-			browser.storage.local.get("count").then((data) => {
-				count = typeof data.count === "number" ? data.count : count;
-				statCount.textContent = String(count);
-			});
+			browser.storage.local
+				.get(["tabStates", "currentTabId"])
+				.then((data) => {
+					if (currentTabId !== null && data.tabStates?.[currentTabId]) {
+						count = data.tabStates[currentTabId].count ?? count;
+					}
+					statCount.textContent = String(count);
+				});
 			remaining = interval;
 		}
 		setRing(remaining, interval);
@@ -122,8 +136,12 @@ function setActive(on: boolean, tabId: number | null = currentTabId) {
 	paused = false;
 	toggleTrack.classList.toggle("on", on);
 	spinIcon.classList.toggle("spinning", on);
-	hSub.textContent = on ? "every " + formatInterval(interval) : "inactive";
-	tabBadge.textContent = on ? "on · " + formatInterval(interval) : "off";
+	hSub.textContent = on
+		? "every " + formatInterval(interval)
+		: "inactive";
+	tabBadge.textContent = on
+		? "on · " + formatInterval(interval)
+		: "off";
 	tabBadge.className = "tab-badge " + (on ? "on" : "off");
 	updateActionButton();
 	updateBadge(tabId);
@@ -140,7 +158,11 @@ function applyInterval(val: number) {
 			interval,
 			tabId: currentTabId,
 		});
-		browser.storage.local.set({ interval });
+		browser.storage.local.set({
+			tabStates: {
+				[currentTabId]: { interval, count, paused: false, remaining: null, randomize: randomizeToggle.checked },
+			},
+		});
 		startTimer();
 	}
 }
@@ -162,28 +184,30 @@ toggleWrap.addEventListener("click", () => {
 	const next = !active;
 
 	if (next) {
-		browser.tabs.query({ active: true, currentWindow: true }).then((tabs) => {
-			const tabId = tabs[0]?.id;
-			if (tabId === undefined) return;
+		browser.tabs
+			.query({ active: true, currentWindow: true })
+			.then((tabs) => {
+				const tabId = tabs[0]?.id;
+				if (tabId === undefined) return;
 
-			currentTabId = tabId;
+				currentTabId = tabId;
 
-			if (tabs[0]?.title) {
-				tabName.textContent = truncateTitle(tabs[0].title);
-			}
+				if (tabs[0]?.title) {
+					tabName.textContent = truncateTitle(tabs[0].title);
+				}
 
-			setActive(true);
-			browser.runtime.sendMessage({
-				action: "start",
-				interval,
-				tabId,
+				setActive(true);
+				browser.runtime.sendMessage({
+					action: "start",
+					interval,
+					tabId,
+				});
+				browser.storage.local.set({
+					active: true,
+					currentTabId,
+					tabStates: {},
+				});
 			});
-			browser.storage.local.set({
-				active: true,
-				interval,
-				tabId,
-			});
-		});
 	} else {
 		const oldTabId = currentTabId;
 		currentTabId = null;
@@ -191,14 +215,18 @@ toggleWrap.addEventListener("click", () => {
 		browser.runtime.sendMessage({ action: "stop" });
 		browser.storage.local.set({
 			active: false,
-			tabId: null,
+			currentTabId: null,
 		});
 	}
 });
 
-document.querySelectorAll<HTMLButtonElement>(".p-btn").forEach((b) => {
-	b.addEventListener("click", () => applyInterval(parseInt(b.dataset.v!)));
-});
+document
+	.querySelectorAll<HTMLButtonElement>(".p-btn")
+	.forEach((b) => {
+		b.addEventListener("click", () =>
+			applyInterval(parseInt(b.dataset.v!)),
+		);
+	});
 
 actionBtn.addEventListener("click", () => {
 	if (!active) {
@@ -230,55 +258,88 @@ browser.commands?.onCommand.addListener((command) => {
 });
 
 // Restore state from storage on popup open
-browser.tabs.query({ active: true, currentWindow: true }).then((tabs) => {
-	const currentTab = tabs[0];
-	if (!currentTab?.id) return;
-	const currentTabIdNum: number = currentTab.id;
+browser.tabs
+	.query({ active: true, currentWindow: true })
+	.then((tabs) => {
+		const currentTab = tabs[0];
+		if (!currentTab?.id) return;
+		const currentTabIdNum: number = currentTab.id;
 
-	if (currentTab.title) tabName.textContent = truncateTitle(currentTab.title);
+		if (currentTab.title)
+			tabName.textContent = truncateTitle(currentTab.title);
 
-	browser.storage.local
-		.get(["interval", "active", "paused", "count", "tabId", "randomize"])
-		.then((data: Partial<StorageState>) => {
-			if (data.interval) {
-				interval = data.interval;
-			}
-			if (data.count) {
-				count = data.count;
-				statCount.textContent = String(count);
-			}
-			if (typeof data.randomize === "boolean") {
-				randomizeToggle.checked = data.randomize;
-			}
+		browser.storage.local
+			.get([
+				"defaultInterval",
+				"active",
+				"currentTabId",
+				"tabStates",
+				"randomize",
+			])
+			.then(
+				(
+					data: Partial<StorageState> & {
+						defaultInterval?: number;
+						currentTabId?: number;
+						tabStates?: Record<number, TabState>;
+					},
+				) => {
+					// Get default interval or use stored one
+					if (data.defaultInterval) {
+						interval = data.defaultInterval;
+					}
 
-			syncPresets();
+					// Get per-tab interval if it exists
+					if (
+						data.tabStates?.[currentTabIdNum]?.interval
+					) {
+						interval =
+							data.tabStates[currentTabIdNum].interval;
+					}
 
-			// Check if auto-refresh is active for THIS specific tab
-			const isThisTabActive = data.active && data.tabId === currentTabIdNum;
+					// Get count from per-tab state
+					if (data.tabStates?.[currentTabIdNum]?.count) {
+						count = data.tabStates[currentTabIdNum].count;
+						statCount.textContent = String(count);
+					}
 
-			if (isThisTabActive) {
-				currentTabId = currentTabIdNum;
-				paused = data.paused || false;
-				setActive(true, currentTabIdNum);
-				if (paused) {
-					spinIcon.classList.remove("spinning");
-					hSub.textContent = "paused";
-					tabBadge.textContent = "paused";
-					updateActionButton();
-				}
-			} else {
-				// Not active for this tab - show inactive state
-				active = false;
-				currentTabId = null;
-				paused = false;
-				toggleTrack.classList.remove("on");
-				spinIcon.classList.remove("spinning");
-				hSub.textContent = "inactive";
-				tabBadge.textContent = "off";
-				tabBadge.className = "tab-badge off";
-				updateActionButton();
-				stopTimer();
-				// Don't touch badge - it's managed by background script
-			}
-		});
-});
+					if (typeof data.randomize === "boolean") {
+						randomizeToggle.checked = data.randomize;
+					}
+
+					syncPresets();
+
+					// Check if auto-refresh is active for THIS specific tab
+					const isThisTabActive =
+						data.active &&
+						data.currentTabId === currentTabIdNum;
+
+					if (isThisTabActive) {
+						currentTabId = currentTabIdNum;
+						paused =
+							data.tabStates?.[currentTabIdNum]
+								?.paused || false;
+						setActive(true, currentTabIdNum);
+						if (paused) {
+							spinIcon.classList.remove("spinning");
+							hSub.textContent = "paused";
+							tabBadge.textContent = "paused";
+							updateActionButton();
+						}
+					} else {
+						// Not active for this tab - show inactive state
+						active = false;
+						currentTabId = null;
+						paused = false;
+						toggleTrack.classList.remove("on");
+						spinIcon.classList.remove("spinning");
+						hSub.textContent = "inactive";
+						tabBadge.textContent = "off";
+						tabBadge.className = "tab-badge off";
+						updateActionButton();
+						stopTimer();
+						// Don't touch badge - it's managed by background script
+					}
+				},
+			);
+	});

@@ -9,5 +9,6 @@
 		"skipLibCheck": true,
 		"types": ["firefox-webext-browser", "bun"]
 	},
-	"include": ["src/**/*", "build.ts"]
+	"include": ["src/**/*", "build.ts"],
+	"exclude": ["src/__tests__", "node_modules"]
 }

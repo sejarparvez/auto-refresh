@@ -4,12 +4,19 @@ export type Message =
 	| { action: "pause" }
 	| { action: "resume" };
 
-export interface StorageState {
+export interface TabState {
 	interval: number;
-	active: boolean;
-	paused: boolean;
-	tabId: number | null;
 	count: number;
+	paused: boolean;
 	remaining: number | null;
 	randomize: boolean;
 }
+
+export interface StorageState {
+	active: boolean;
+	currentTabId: number | null;
+	tabStates: Record<number, TabState>;
+	defaultInterval: number;
+	randomize: boolean;
+}
+
