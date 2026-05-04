@@ -23,7 +23,7 @@ jobs:
       - name: Build extension (production)
         run: bun run build:prod
 
-      - name: Package extension (correct structure)
+      - name: Create extension zip (correct structure)
         run: |
           # Create zip with ALL files at root level
           # manifest.json, popup.html, dist/, icons/, fonts/ must be at zip root
@@ -34,17 +34,26 @@ jobs:
           ls -la manifest.json popup.html
           ls dist/ icons/ fonts/
           
-          # Create zip - files will be at root
-          zip -r auto-refresh-${{ github.event.release.tag_name }}.zip \
-            manifest.json \
-            popup.html \
-            dist \
-            icons \
-            fonts
+          # Create zip - files will be at root of zip
+          # Using -j flag to junk paths (store only filenames)
+          # Actually, we need to cd into each dir and add files
+          
+          # Better approach: create temp dir and copy files there
+          mkdir -p /tmp/extension
+          cp manifest.json /tmp/extension/
+          cp popup.html /tmp/extension/
+          cp -r dist /tmp/extension/
+          cp -r icons /tmp/extension/
+          cp -r fonts /tmp/extension/
+          
+          # Create zip from temp dir
+          cd /tmp/extension
+          zip -r ${{ github.workspace }}/auto-refresh-${{ github.event.release.tag_name }}.zip .
           
           # Verify zip structure
           echo "=== Zip contents (manifest.json should be at root) ==="
-          unzip -l auto-refresh-${{ github.event.release.tag_name }}.zip | grep -E "^ [^/]*/|manifest.json"
+          cd ${{ github.workspace }}
+          unzip -l auto-refresh-${{ github.event.release.tag_name }}.zip | head -20
 
       - name: Sign and upload to AMO
         if: ${{ secrets.AMO_API_KEY != '' && secrets.AMO_API_SECRET != '' }}
