@@ -23,28 +23,29 @@ jobs:
       - name: Build extension (production)
         run: bun run build:prod
 
-      - name: Create extension zip correctly
+      - name: Create extension zip (correct structure)
         run: |
-          # Create a clean directory with all files at root level
-          mkdir -p extension-build
-          cp manifest.json extension-build/
-          cp popup.html extension-build/
-          cp -r dist extension-build/
-          cp -r icons extension-build/
-          cp -r fonts extension-build/
+          # Create zip with ALL files at root level
+          # manifest.json, popup.html, dist/, icons/, fonts/ must be at root of zip
+          cd /home/sejar/MyCode/auto-refresh
           
-          # Verify structure
-          echo "=== Extension build structure ==="
-          find extension-build -type f | head -20
+          # List files to include
+          echo "Files to zip:"
+          ls -la manifest.json popup.html
+          ls dist/ icons/ fonts/
           
-          # Create zip from inside the directory to ensure files are at root
-          cd extension-build
-          zip -r ../auto-refresh-${{ github.event.release.tag_name }}.zip .
-          cd ..
+          # Create zip - all files at root level
+          # Using relative paths and running from repo root
+          zip -r auto-refresh-${{ github.event.release.tag_name }}.zip \
+            manifest.json \
+            popup.html \
+            dist/ \
+            icons/ \
+            fonts/
           
           # Verify zip structure
           echo "=== Zip contents ==="
-          unzip -l auto-refresh-${{ github.event.release.tag_name }}.zip | head -20
+          unzip -l auto-refresh-${{ github.event.release.tag_name }}.zip | head -30
 
       - name: Sign and upload to AMO
         if: ${{ secrets.AMO_API_KEY != '' && secrets.AMO_API_SECRET != '' }}
