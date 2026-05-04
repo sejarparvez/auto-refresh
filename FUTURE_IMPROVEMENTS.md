@@ -4,24 +4,13 @@ This file contains suggestions for further enhancing the Auto Refresh Tab Firefo
 
 ---
 
-## 🎨 Features & UX Enhancements
 
-### High Value (Easy Wins)
-- [ ] **"Refresh Now" button** - Add a button in the popup to manually trigger a refresh without waiting for the interval
-- [ ] **Badge text on icon** - Show "ON" or remaining seconds directly on the toolbar icon using `browser.action.setBadgeText()`
-- [ ] **Self-host fonts or use system fonts** - Remove Google Fonts from `popup.html` (privacy concern - phones home, also won't work offline). Consider using system fonts like:
-  ```css
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  ```
+
+## 🎨 Features & UX Enhancements (Pending)
 
 ### Medium Value
-- [ ] **Pause/Resume** - Instead of just On/Off toggle, add pause/resume that preserves the remaining time
 - [ ] **Per-tab intervals** - Remember different intervals for different tabs or domains
-- [ ] **Only refresh when tab is active** - Skip refresh if the user isn't currently viewing the tab (use `browser.tabs.onActivated`)
 - [ ] **URL pattern whitelist/blacklist** - Only auto-refresh on matching URLs
-- [ ] **Keyboard shortcut** - Assign a hotkey to toggle auto-refresh using the `commands` API in manifest.json
-- [ ] **Show last refresh time** - Display "Last refreshed at 12:34 PM" in the popup
-- [ ] **Randomized interval** (±10%) - Add slight randomization to avoid predictable traffic patterns to servers
 
 ### Nice to Have
 - [ ] **Notification on refresh** - Optional browser notification when a refresh happens (with toggle to enable/disable)
@@ -32,7 +21,7 @@ This file contains suggestions for further enhancing the Auto Refresh Tab Firefo
 
 ## 🏗️ Code & Architecture Improvements
 
-- [ ] **Add unit tests** - Test message handling, storage operations, timer logic (consider `jest` or `vitest`)
+- [ ] **Add unit tests** - Test message handling, storage operations, timer logic (consider `vitest`)
 - [ ] **Add a pre-build clean step** - Delete `dist/` before building to avoid stale files:
   ```typescript
   // In build.ts
@@ -67,7 +56,6 @@ This file contains suggestions for further enhancing the Auto Refresh Tab Firefo
 ## 🔒 Privacy & Security
 
 - [ ] **Review CSP** - Current CSP is good, but could tighten `script-src` further if needed
-- [ ] **Self-host fonts** - As mentioned above, remove Google Fonts dependency for privacy and offline support
 - [ ] **Add privacy policy** - Required for AMO publication
 
 ---
@@ -89,22 +77,21 @@ This file contains suggestions for further enhancing the Auto Refresh Tab Firefo
 
 ---
 
-## 💎 Popup Polish
+## ❌ Rejected / Not Needed
 
-- [ ] **Show last refresh time** - "Last refreshed at 12:34 PM" in the popup
-- [ ] **Statistics section** - Total refreshes, average interval, etc.
-- [ ] **Manual dark mode toggle** - Override system preference if users want to force a specific theme
+- **"Only refresh when tab is active"** - Would defeat the core purpose of auto-refresh
+- **"Show last refresh time"** - Minimal user value
+- **"Refresh Now" button** - Replaced with consolidated Start/Pause/Resume action button
 
 ---
 
 ## 📊 Suggested Implementation Order
 
-1. **Self-host fonts or remove Google Fonts** (privacy + works offline)
-2. **Add "Refresh Now" button** (high user value, easy to implement)
-3. **Badge text on icon** (shows state at a glance)
-4. **Add LICENSE file** (if open-sourcing)
-5. **Add unit tests** (improves code quality)
-6. Other features as desired
+1. **Add LICENSE file** (if open-sourcing)
+2. **Add unit tests** (improves code quality)
+3. **Per-tab intervals** (high user value)
+4. **URL pattern whitelist** (high user value)
+5. Other features as desired
 
 ---
 

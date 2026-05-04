@@ -96,10 +96,10 @@
     .s-input::-webkit-outer-spin-button { -webkit-appearance: none; }
     .s-unit { font-size: 12px; color: var(--muted); margin-left: 8px; }
 
-    .presets { display: flex; gap: 5px; }
+    .presets { display: flex; flex-wrap: wrap; gap: 5px; }
     .p-btn {
-      flex: 1; font-family: 'Geist', monospace; font-size: 10px;
-      padding: 5px 0; border: 1px solid var(--border); border-radius: 6px;
+      flex: 0 0 auto; min-width: 36px; font-family: 'Geist', monospace; font-size: 10px;
+      padding: 5px 8px; border: 1px solid var(--border); border-radius: 6px;
       background: transparent; color: var(--muted); cursor: pointer; text-align: center;
       transition: all 0.12s;
     }
@@ -117,17 +117,45 @@
     .tab-badge.on  { background: var(--success-bg); color: var(--success); }
     .tab-badge.off { background: var(--surface); color: var(--muted); border: 1px solid var(--border); }
 
-    .refresh-btn {
+    .action-btn {
       width: 100%; padding: 8px 0; margin-top: 10px;
-      background: var(--success); color: var(--bg);
       border: none; border-radius: 8px;
       font-family: 'Geist', sans-serif; font-size: 13px; font-weight: 600;
-      cursor: pointer; transition: opacity 0.15s;
+      cursor: pointer; transition: all 0.15s;
     }
-    .refresh-btn:hover { opacity: 0.85; }
-    .refresh-btn:active { transform: scale(0.97); }
-    .refresh-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .action-btn.primary {
+      background: var(--success); color: var(--bg);
+    }
+    .action-btn.secondary {
+      background: var(--surface); color: var(--tx);
+      border: 1px solid var(--border);
+    }
+    .action-btn:hover { opacity: 0.85; }
+    .action-btn:active { transform: scale(0.97); }
+    .action-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .randomize-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 0 0; font-size: 10px; color: var(--muted);
+      letter-spacing: 0.3px;
+    }
+    .switch {
+      position: relative; width: 34px; height: 18px; flex-shrink: 0;
+    }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider {
+      position: absolute; cursor: pointer; inset: 0;
+      background: var(--border); border-radius: 18px; transition: 0.25s;
+    }
+    .slider::before {
+      content: ""; position: absolute; height: 14px; width: 14px;
+      left: 2px; bottom: 2px; border-radius: 50%;
+      background: var(--bg); transition: transform 0.25s;
+    }
+    input:checked + .slider { background: var(--success); }
+    input:checked + .slider::before { transform: translateX(16px); }
   </style>
+  
 </head>
 <body>
 
@@ -182,21 +210,15 @@
 
   <div class="interval-block">
     <div class="interval-lbl">Set interval</div>
-    <div style="display:flex; align-items:center;">
-      <div class="stepper-row">
-        <button class="s-btn" id="sDec">−</button>
-        <!-- default value updated from 30 to 60 to match MIN_INTERVAL -->
-        <input class="s-input" type="number" id="sVal" value="60" min="60">
-        <button class="s-btn" id="sInc">+</button>
-      </div>
-      <span class="s-unit">seconds</span>
-    </div>
-    <!-- Presets updated from 10s/30s/1m/5m → 1m/2m/5m/10m to reflect 60s minimum -->
-    <div style="margin-top:10px;" class="presets" id="presets">
-      <button class="p-btn active" data-v="60">1m</button>
+    <div class="presets" id="presets">
+      <button class="p-btn" data-v="60">1m</button>
       <button class="p-btn" data-v="120">2m</button>
       <button class="p-btn" data-v="300">5m</button>
-      <button class="p-btn" data-v="600">10m</button>
+      <button class="p-btn active" data-v="600">10m</button>
+      <button class="p-btn" data-v="900">15m</button>
+      <button class="p-btn" data-v="1200">20m</button>
+      <button class="p-btn" data-v="1500">25m</button>
+      <button class="p-btn" data-v="1800">30m</button>
     </div>
   </div>
 
@@ -208,7 +230,15 @@
     </div>
   </div>
 
-  <button class="refresh-btn" id="refreshNow" disabled>Refresh Now</button>
+  <button class="action-btn primary" id="actionBtn">Start</button>
+
+  <div class="randomize-row">
+    <span>Randomize interval (±10%)</span>
+    <label class="switch">
+      <input type="checkbox" id="randomizeToggle">
+      <span class="slider"></span>
+    </label>
+  </div>
 
   <script src="dist/popup.js"></script>
 </body>

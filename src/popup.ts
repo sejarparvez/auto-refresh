@@ -8,10 +8,12 @@ const ringNum = document.getElementById("ringNum")!;
 const progressArc = document.getElementById("progressArc")!;
 const statInterval = document.getElementById("statInterval")!;
 const statCount = document.getElementById("statCount")!;
-const sVal = document.getElementById("sVal") as HTMLInputElement;
 const tabName = document.getElementById("tabName")!;
 const tabBadge = document.getElementById("tabBadge")!;
-const refreshNow = document.getElementById("refreshNow") as HTMLButtonElement;
+const actionBtn = document.getElementById("actionBtn") as HTMLButtonElement;
+const randomizeToggle = document.getElementById("randomizeToggle") as HTMLInputElement;
+
+let paused = false;
 
 const CIRC = 251.2;
 const MIN_INTERVAL = 60; // Firefox alarm minimum is 1 minute
@@ -88,22 +90,42 @@ function stopTimer() {
 }
 
 function updateBadge(tabId: number | null = currentTabId) {
-	if (active && tabId !== null) {
+	if (active && !paused && tabId !== null) {
 		browser.action.setBadgeText({ text: "ON", tabId });
 		browser.action.setBadgeBackgroundColor({ color: "#16a34a" });
+	} else if (active && paused && tabId !== null) {
+		browser.action.setBadgeText({ text: "PAUSED", tabId });
+		browser.action.setBadgeBackgroundColor({ color: "#f59e0b" });
 	} else if (tabId !== null) {
 		browser.action.setBadgeText({ text: "", tabId });
 	}
 }
 
+function updateActionButton() {
+	if (!active) {
+		actionBtn.textContent = "Start";
+		actionBtn.className = "action-btn primary";
+		actionBtn.style.display = "block";
+	} else if (paused) {
+		actionBtn.textContent = "Resume";
+		actionBtn.className = "action-btn secondary";
+		actionBtn.style.display = "block";
+	} else {
+		actionBtn.textContent = "Pause";
+		actionBtn.className = "action-btn primary";
+		actionBtn.style.display = "block";
+	}
+}
+
 function setActive(on: boolean, tabId: number | null = currentTabId) {
 	active = on;
+	paused = false;
 	toggleTrack.classList.toggle("on", on);
 	spinIcon.classList.toggle("spinning", on);
 	hSub.textContent = on ? "every " + formatInterval(interval) : "inactive";
 	tabBadge.textContent = on ? "on · " + formatInterval(interval) : "off";
 	tabBadge.className = "tab-badge " + (on ? "on" : "off");
-	refreshNow.disabled = !on;
+	updateActionButton();
 	updateBadge(tabId);
 	if (on) startTimer();
 	else stopTimer();
@@ -111,7 +133,6 @@ function setActive(on: boolean, tabId: number | null = currentTabId) {
 
 function applyInterval(val: number) {
 	interval = Math.max(MIN_INTERVAL, val);
-	sVal.value = String(interval);
 	syncPresets();
 	if (active && currentTabId !== null) {
 		browser.runtime.sendMessage({
@@ -124,32 +145,45 @@ function applyInterval(val: number) {
 	}
 }
 
+randomizeToggle.addEventListener("change", () => {
+	const randomize = randomizeToggle.checked;
+	browser.storage.local.set({ randomize });
+	if (active && currentTabId !== null) {
+		// Restart with new randomize setting
+		browser.runtime.sendMessage({
+			action: "start",
+			interval,
+			tabId: currentTabId,
+		});
+	}
+});
+
 toggleWrap.addEventListener("click", () => {
 	const next = !active;
 
-		if (next) {
-			browser.tabs.query({ active: true, currentWindow: true }).then((tabs) => {
-				const tabId = tabs[0]?.id;
-				if (tabId === undefined) return;
+	if (next) {
+		browser.tabs.query({ active: true, currentWindow: true }).then((tabs) => {
+			const tabId = tabs[0]?.id;
+			if (tabId === undefined) return;
 
-				currentTabId = tabId;
+			currentTabId = tabId;
 
-				if (tabs[0]?.title) {
-					tabName.textContent = truncateTitle(tabs[0].title);
-				}
+			if (tabs[0]?.title) {
+				tabName.textContent = truncateTitle(tabs[0].title);
+			}
 
-				setActive(true);
-				browser.runtime.sendMessage({
-					action: "start",
-					interval,
-					tabId,
-				});
-				browser.storage.local.set({
-					active: true,
-					interval,
-					tabId,
-				});
+			setActive(true);
+			browser.runtime.sendMessage({
+				action: "start",
+				interval,
+				tabId,
 			});
+			browser.storage.local.set({
+				active: true,
+				interval,
+				tabId,
+			});
+		});
 	} else {
 		const oldTabId = currentTabId;
 		currentTabId = null;
@@ -162,43 +196,37 @@ toggleWrap.addEventListener("click", () => {
 	}
 });
 
-document
-	.getElementById("sInc")!
-	.addEventListener("click", () => applyInterval(interval + 1));
-document
-	.getElementById("sDec")!
-	.addEventListener("click", () => applyInterval(interval - 1));
-
-sVal.addEventListener("input", () => {
-	const v = parseInt(sVal.value);
-	if (isNaN(v) || v < 1) return;
-	applyInterval(v);
-});
-
 document.querySelectorAll<HTMLButtonElement>(".p-btn").forEach((b) => {
 	b.addEventListener("click", () => applyInterval(parseInt(b.dataset.v!)));
 });
 
-refreshNow.addEventListener("click", () => {
-	if (currentTabId !== null) {
-		browser.tabs.reload(currentTabId).then(() => {
-			// Increment count immediately on manual refresh
-			browser.storage.local.get("count").then((data) => {
-				const newCount = (typeof data.count === "number" ? data.count : 0) + 1;
-				browser.storage.local.set({ count: newCount });
-				count = newCount;
-				statCount.textContent = String(count);
-			});
-			// Reset the visual countdown
-			remaining = interval;
-			setRing(remaining, interval);
-		});
+actionBtn.addEventListener("click", () => {
+	if (!active) {
+		// Start
+		toggleWrap.click();
+	} else if (paused) {
+		// Resume
+		paused = false;
+		browser.runtime.sendMessage({ action: "resume" });
+		startTimer();
+		updateBadge();
+		updateActionButton();
+	} else {
+		// Pause
+		paused = true;
+		browser.runtime.sendMessage({ action: "pause" });
+		stopTimer();
+		updateBadge();
+		updateActionButton();
 	}
 });
 
-// Initial tab title
-browser.tabs.query({ active: true, currentWindow: true }).then((tabs) => {
-	if (tabs[0]?.title) tabName.textContent = truncateTitle(tabs[0].title);
+// Keyboard shortcut handler
+browser.commands?.onCommand.addListener((command) => {
+	if (command === "toggle-refresh") {
+		// Simulate toggle click
+		toggleWrap.click();
+	}
 });
 
 // Restore state from storage on popup open
@@ -210,15 +238,17 @@ browser.tabs.query({ active: true, currentWindow: true }).then((tabs) => {
 	if (currentTab.title) tabName.textContent = truncateTitle(currentTab.title);
 
 	browser.storage.local
-		.get(["interval", "active", "count", "tabId"])
+		.get(["interval", "active", "paused", "count", "tabId", "randomize"])
 		.then((data: Partial<StorageState>) => {
 			if (data.interval) {
 				interval = data.interval;
-				sVal.value = String(interval);
 			}
 			if (data.count) {
 				count = data.count;
 				statCount.textContent = String(count);
+			}
+			if (typeof data.randomize === "boolean") {
+				randomizeToggle.checked = data.randomize;
 			}
 
 			syncPresets();
@@ -228,17 +258,25 @@ browser.tabs.query({ active: true, currentWindow: true }).then((tabs) => {
 
 			if (isThisTabActive) {
 				currentTabId = currentTabIdNum;
+				paused = data.paused || false;
 				setActive(true, currentTabIdNum);
+				if (paused) {
+					spinIcon.classList.remove("spinning");
+					hSub.textContent = "paused";
+					tabBadge.textContent = "paused";
+					updateActionButton();
+				}
 			} else {
 				// Not active for this tab - show inactive state
 				active = false;
 				currentTabId = null;
+				paused = false;
 				toggleTrack.classList.remove("on");
 				spinIcon.classList.remove("spinning");
 				hSub.textContent = "inactive";
 				tabBadge.textContent = "off";
 				tabBadge.className = "tab-badge off";
-				refreshNow.disabled = true;
+				updateActionButton();
 				stopTimer();
 				// Don't touch badge - it's managed by background script
 			}

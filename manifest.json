@@ -1,9 +1,15 @@
 {
 	"manifest_version": 3,
 	"name": "Auto Refresh Tab",
-	"version": "1.0",
+	"version": "1.1",
 	"description": "Automatically refresh the current tab at a set interval",
 	"permissions": ["tabs", "alarms", "storage"],
+	"commands": {
+		"toggle-refresh": {
+			"suggested_key": { "default": "Alt+R" },
+			"description": "Toggle auto-refresh for current tab"
+		}
+	},
 	"browser_specific_settings": {
 		"gecko": {
 			"id": "auto-refresh@yourdomain.com",
