@@ -23,18 +23,18 @@ jobs:
       - name: Build extension (production)
         run: bun run build:prod
 
-      - name: Create extension zip (manifest.json at root)
+      - name: Package extension (correct structure)
         run: |
-          # Create zip with manifest.json, popup.html at root level
-          # The zip command must run from the repo root
+          # Create zip with ALL files at root level
+          # manifest.json, popup.html, dist/, icons/, fonts/ must be at zip root
           cd ${{ github.workspace }}
           
           # Verify files exist
-          echo "=== Checking required files ==="
+          echo "=== Checking files ==="
           ls -la manifest.json popup.html
           ls dist/ icons/ fonts/
           
-          # Create zip with all files - they will be at root of zip
+          # Create zip - files will be at root
           zip -r auto-refresh-${{ github.event.release.tag_name }}.zip \
             manifest.json \
             popup.html \
@@ -43,8 +43,8 @@ jobs:
             fonts
           
           # Verify zip structure
-          echo "=== Zip contents (should show manifest.json at root) ==="
-          unzip -l auto-refresh-${{ github.event.release.tag_name }}.zip | head -20
+          echo "=== Zip contents (manifest.json should be at root) ==="
+          unzip -l auto-refresh-${{ github.event.release.tag_name }}.zip | grep -E "^ [^/]*/|manifest.json"
 
       - name: Sign and upload to AMO
         if: ${{ secrets.AMO_API_KEY != '' && secrets.AMO_API_SECRET != '' }}
