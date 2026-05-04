@@ -25,27 +25,21 @@ jobs:
 
       - name: Create extension zip (correct structure)
         run: |
-          # Create zip with ALL files at root level
-          # manifest.json, popup.html, dist/, icons/, fonts/ must be at root of zip
-          cd /home/sejar/MyCode/auto-refresh
+          # Create the zip with ALL required files at root level
+          # manifest.json, popup.html, dist/, icons/, fonts/ must be at zip root
+          cd $GITHUB_WORKSPACE
           
-          # List files to include
-          echo "Files to zip:"
-          ls -la manifest.json popup.html
-          ls dist/ icons/ fonts/
-          
-          # Create zip - all files at root level
-          # Using relative paths and running from repo root
+          # Create zip with files at root
           zip -r auto-refresh-${{ github.event.release.tag_name }}.zip \
             manifest.json \
             popup.html \
-            dist/ \
-            icons/ \
-            fonts/
+            dist \
+            icons \
+            fonts
           
-          # Verify zip structure
-          echo "=== Zip contents ==="
-          unzip -l auto-refresh-${{ github.event.release.tag_name }}.zip | head -30
+          # Verify zip structure - manifest.json should be at root
+          echo "=== Zip structure ==="
+          unzip -l auto-refresh-${{ github.event.release.tag_name }}.zip | grep -E "manifest.json|popup.html|dist/|icons/|fonts/"
 
       - name: Sign and upload to AMO
         if: ${{ secrets.AMO_API_KEY != '' && secrets.AMO_API_SECRET != '' }}
