@@ -21,7 +21,6 @@ This file contains suggestions for further enhancing the Auto Refresh Tab Firefo
 
 ## 🏗️ Code & Architecture Improvements
 
-- [ ] **Add unit tests** - Test message handling, storage operations, timer logic (consider `vitest`)
 - [ ] **Add a pre-build clean step** - Delete `dist/` before building to avoid stale files:
   ```typescript
   // In build.ts
@@ -75,13 +74,6 @@ This file contains suggestions for further enhancing the Auto Refresh Tab Firefo
 - [ ] **Automated AMO deployment** - Publish new versions automatically on GitHub releases using `web-ext`
 - [ ] **Source maps** - Add for debugging (remember to exclude from production builds)
 
----
-
-## ❌ Rejected / Not Needed
-
-- **"Only refresh when tab is active"** - Would defeat the core purpose of auto-refresh
-- **"Show last refresh time"** - Minimal user value
-- **"Refresh Now" button** - Replaced with consolidated Start/Pause/Resume action button
 
 ---
 

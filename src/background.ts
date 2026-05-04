@@ -1,6 +1,6 @@
 import type { Message, StorageState } from "./types";
 
-function isMessage(msg: unknown): msg is Message {
+export function isMessage(msg: unknown): msg is Message {
 	return typeof msg === "object" && msg !== null && "action" in msg;
 }
 
@@ -119,7 +119,7 @@ browser.runtime.onMessage.addListener((msg: unknown) => {
 });
 
 // Apply ±10% jitter to an interval
-function jitteredInterval(base: number): number {
+export function jitteredInterval(base: number): number {
 	const jitter = base * 0.1;
 	return Math.round(base + (Math.random() * 2 - 1) * jitter);
 }
