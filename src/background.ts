@@ -28,6 +28,10 @@ browser.runtime.onMessage.addListener((msg: unknown) => {
 			tabId,
 		});
 
+		// Set badge on the specific tab
+		browser.action.setBadgeText({ text: "ON", tabId });
+		browser.action.setBadgeBackgroundColor({ color: "#16a34a" });
+
 		browser.alarms.clear("autoRefresh").then(() => {
 			browser.alarms.create("autoRefresh", {
 				periodInMinutes: clampedInterval / 60,
@@ -36,6 +40,12 @@ browser.runtime.onMessage.addListener((msg: unknown) => {
 	}
 
 	if (msg.action === "stop") {
+		browser.storage.local.get("tabId").then((data) => {
+			const tabId = typeof data.tabId === "number" ? data.tabId : null;
+			if (tabId !== null) {
+				browser.action.setBadgeText({ text: "", tabId });
+			}
+		});
 		browser.alarms.clear("autoRefresh");
 		browser.storage.local.set({
 			active: false,
@@ -62,6 +72,13 @@ browser.alarms.onAlarm.addListener((alarm: browser.alarms.Alarm) => {
 					// Tab was closed — stop everything
 					browser.alarms.clear("autoRefresh");
 					browser.storage.local.set({ active: false, tabId: null });
+					// Clear badge - get tabId first then clear
+					browser.storage.local.get("tabId").then((d) => {
+						const tid = typeof d.tabId === "number" ? d.tabId : null;
+						if (tid !== null) {
+							browser.action.setBadgeText({ text: "", tabId: tid });
+						}
+					});
 				});
 		});
 	}

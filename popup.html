@@ -1,16 +1,22 @@
 <!DOCTYPE html>
 <html>
-<head>
+  <head>
   <meta charset="utf-8">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@500;600&display=swap" rel="stylesheet">
   <style>
+    @font-face {
+      font-family: 'Geist';
+      src: url('fonts/Geist/Geist-VariableFont_wght.ttf') format('truetype');
+      font-weight: 100 900;
+      font-style: normal;
+      font-display: swap;
+    }
+
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
       width: 270px;
       padding: 20px;
-      font-family: 'Syne', sans-serif;
+      font-family: 'Geist', sans-serif;
       background: var(--bg, #ffffff);
       color: var(--tx, #111111);
     }
@@ -33,7 +39,7 @@
     .spinning { animation: spin 2s linear infinite; transform-origin: center; }
     @keyframes spin { to { transform: rotate(360deg); } }
     .h-title { font-size: 14px; font-weight: 600; color: var(--tx); }
-    .h-sub { font-size: 11px; color: var(--muted); margin-top: 1px; font-family: 'DM Mono', monospace; }
+    .h-sub { font-size: 11px; color: var(--muted); margin-top: 1px; font-family: 'Geist', monospace; }
 
     .toggle-wrap { cursor: pointer; }
     .toggle-track {
@@ -50,15 +56,15 @@
     .toggle-track.on .toggle-thumb { transform: translateX(20px); }
 
     .ring-wrap { display: flex; justify-content: center; margin-bottom: 14px; }
-    .ring-num { font-family: 'DM Mono', monospace; font-size: 22px; font-weight: 500; fill: var(--tx, #111); }
-    .ring-sub { font-size: 10px; fill: var(--muted, #999); font-family: 'Syne', sans-serif; }
+    .ring-num { font-family: 'Geist', monospace; font-size: 22px; font-weight: 500; fill: var(--tx, #111); }
+    .ring-sub { font-size: 10px; fill: var(--muted, #999); font-family: 'Geist', sans-serif; }
     .ring-track { stroke: var(--border, #e0e0e0); }
     .ring-progress { stroke: var(--success, #16a34a); transition: stroke-dashoffset 1s linear; }
 
     .stats-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
     .stat-card { background: var(--surface); border-radius: 8px; padding: 10px 12px; }
     .stat-lbl { font-size: 10px; color: var(--muted); font-weight: 500; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 4px; }
-    .stat-val { font-family: 'DM Mono', monospace; font-size: 20px; font-weight: 500; color: var(--tx); }
+    .stat-val { font-family: 'Geist', monospace; font-size: 20px; font-weight: 500; color: var(--tx); }
 
     .divider { height: 1px; background: var(--border); margin: 14px 0; }
 
@@ -92,7 +98,7 @@
 
     .presets { display: flex; gap: 5px; }
     .p-btn {
-      flex: 1; font-family: 'DM Mono', monospace; font-size: 10px;
+      flex: 1; font-family: 'Geist', monospace; font-size: 10px;
       padding: 5px 0; border: 1px solid var(--border); border-radius: 6px;
       background: transparent; color: var(--muted); cursor: pointer; text-align: center;
       transition: all 0.12s;
@@ -107,9 +113,20 @@
       padding: 7px 10px; background: var(--surface); border-radius: 8px; margin-bottom: 5px;
     }
     .tab-name { font-size: 12px; color: var(--tx); max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .tab-badge { font-family: 'DM Mono', monospace; font-size: 10px; padding: 2px 7px; border-radius: 20px; }
+    .tab-badge { font-family: 'Geist', monospace; font-size: 10px; padding: 2px 7px; border-radius: 20px; }
     .tab-badge.on  { background: var(--success-bg); color: var(--success); }
     .tab-badge.off { background: var(--surface); color: var(--muted); border: 1px solid var(--border); }
+
+    .refresh-btn {
+      width: 100%; padding: 8px 0; margin-top: 10px;
+      background: var(--success); color: var(--bg);
+      border: none; border-radius: 8px;
+      font-family: 'Geist', sans-serif; font-size: 13px; font-weight: 600;
+      cursor: pointer; transition: opacity 0.15s;
+    }
+    .refresh-btn:hover { opacity: 0.85; }
+    .refresh-btn:active { transform: scale(0.97); }
+    .refresh-btn:disabled { opacity: 0.4; cursor: not-allowed; }
   </style>
 </head>
 <body>
@@ -190,6 +207,8 @@
       <span class="tab-badge" id="tabBadge" class="off">off</span>
     </div>
   </div>
+
+  <button class="refresh-btn" id="refreshNow" disabled>Refresh Now</button>
 
   <script src="dist/popup.js"></script>
 </body>

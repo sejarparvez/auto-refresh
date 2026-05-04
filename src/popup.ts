@@ -11,6 +11,7 @@ const statCount = document.getElementById("statCount")!;
 const sVal = document.getElementById("sVal") as HTMLInputElement;
 const tabName = document.getElementById("tabName")!;
 const tabBadge = document.getElementById("tabBadge")!;
+const refreshNow = document.getElementById("refreshNow") as HTMLButtonElement;
 
 const CIRC = 251.2;
 const MIN_INTERVAL = 60; // Firefox alarm minimum is 1 minute
@@ -86,13 +87,24 @@ function stopTimer() {
 	ringNum.textContent = "—";
 }
 
-function setActive(on: boolean) {
+function updateBadge(tabId: number | null = currentTabId) {
+	if (active && tabId !== null) {
+		browser.action.setBadgeText({ text: "ON", tabId });
+		browser.action.setBadgeBackgroundColor({ color: "#16a34a" });
+	} else if (tabId !== null) {
+		browser.action.setBadgeText({ text: "", tabId });
+	}
+}
+
+function setActive(on: boolean, tabId: number | null = currentTabId) {
 	active = on;
 	toggleTrack.classList.toggle("on", on);
 	spinIcon.classList.toggle("spinning", on);
 	hSub.textContent = on ? "every " + formatInterval(interval) : "inactive";
 	tabBadge.textContent = on ? "on · " + formatInterval(interval) : "off";
 	tabBadge.className = "tab-badge " + (on ? "on" : "off");
+	refreshNow.disabled = !on;
+	updateBadge(tabId);
 	if (on) startTimer();
 	else stopTimer();
 }
@@ -138,15 +150,16 @@ toggleWrap.addEventListener("click", () => {
 					tabId,
 				});
 			});
-		} else {
-			currentTabId = null;
-			setActive(false);
-			browser.runtime.sendMessage({ action: "stop" });
-			browser.storage.local.set({
-				active: false,
-				tabId: null,
-			});
-		}
+	} else {
+		const oldTabId = currentTabId;
+		currentTabId = null;
+		setActive(false, oldTabId);
+		browser.runtime.sendMessage({ action: "stop" });
+		browser.storage.local.set({
+			active: false,
+			tabId: null,
+		});
+	}
 });
 
 document
@@ -166,35 +179,68 @@ document.querySelectorAll<HTMLButtonElement>(".p-btn").forEach((b) => {
 	b.addEventListener("click", () => applyInterval(parseInt(b.dataset.v!)));
 });
 
+refreshNow.addEventListener("click", () => {
+	if (currentTabId !== null) {
+		browser.tabs.reload(currentTabId).then(() => {
+			// Increment count immediately on manual refresh
+			browser.storage.local.get("count").then((data) => {
+				const newCount = (typeof data.count === "number" ? data.count : 0) + 1;
+				browser.storage.local.set({ count: newCount });
+				count = newCount;
+				statCount.textContent = String(count);
+			});
+			// Reset the visual countdown
+			remaining = interval;
+			setRing(remaining, interval);
+		});
+	}
+});
+
 // Initial tab title
 browser.tabs.query({ active: true, currentWindow: true }).then((tabs) => {
 	if (tabs[0]?.title) tabName.textContent = truncateTitle(tabs[0].title);
 });
 
 // Restore state from storage on popup open
-browser.storage.local
-	.get(["interval", "active", "count", "tabId"])
-	.then((data: Partial<StorageState>) => {
-		if (data.interval) {
-			interval = data.interval;
-			sVal.value = String(interval);
-		}
-		if (data.count) {
-			count = data.count;
-			statCount.textContent = String(count);
-		}
-		if (data.tabId) {
-			currentTabId = data.tabId;
-			browser.tabs
-				.get(data.tabId)
-				.then((tab) => {
-					if (tab?.title) tabName.textContent = truncateTitle(tab.title);
-				})
-				.catch(() => {
-					// Tab no longer exists
-					browser.storage.local.set({ active: false, tabId: null });
-				});
-		}
-		syncPresets();
-		if (data.active) setActive(true);
-	});
+browser.tabs.query({ active: true, currentWindow: true }).then((tabs) => {
+	const currentTab = tabs[0];
+	if (!currentTab?.id) return;
+	const currentTabIdNum: number = currentTab.id;
+
+	if (currentTab.title) tabName.textContent = truncateTitle(currentTab.title);
+
+	browser.storage.local
+		.get(["interval", "active", "count", "tabId"])
+		.then((data: Partial<StorageState>) => {
+			if (data.interval) {
+				interval = data.interval;
+				sVal.value = String(interval);
+			}
+			if (data.count) {
+				count = data.count;
+				statCount.textContent = String(count);
+			}
+
+			syncPresets();
+
+			// Check if auto-refresh is active for THIS specific tab
+			const isThisTabActive = data.active && data.tabId === currentTabIdNum;
+
+			if (isThisTabActive) {
+				currentTabId = currentTabIdNum;
+				setActive(true, currentTabIdNum);
+			} else {
+				// Not active for this tab - show inactive state
+				active = false;
+				currentTabId = null;
+				toggleTrack.classList.remove("on");
+				spinIcon.classList.remove("spinning");
+				hSub.textContent = "inactive";
+				tabBadge.textContent = "off";
+				tabBadge.className = "tab-badge off";
+				refreshNow.disabled = true;
+				stopTimer();
+				// Don't touch badge - it's managed by background script
+			}
+		});
+});
