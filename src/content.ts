@@ -8,9 +8,9 @@ let countdownValue: HTMLSpanElement | null = null;
 let countdownInterval: ReturnType<typeof setInterval> | null = null;
 
 function createOverlay(): HTMLDivElement {
-  const el = document.createElement("div");
-  el.id = "auto-refresh-overlay";
-  el.style.cssText = `
+	const el = document.createElement("div");
+	el.id = "auto-refresh-overlay";
+	el.style.cssText = `
     position: fixed;
     bottom: 20px;
     right: 20px;
@@ -27,80 +27,80 @@ function createOverlay(): HTMLDivElement {
     transition: opacity 0.3s;
   `;
 
-  const text = document.createElement("span");
-  text.textContent = "Auto-refresh in ";
-  el.appendChild(text);
+	const text = document.createElement("span");
+	text.textContent = "Auto-refresh in ";
+	el.appendChild(text);
 
-  countdownValue = document.createElement("span");
-  countdownValue.style.fontWeight = "bold";
-  el.appendChild(countdownValue);
+	countdownValue = document.createElement("span");
+	countdownValue.style.fontWeight = "bold";
+	el.appendChild(countdownValue);
 
-  const secondsText = document.createElement("span");
-  secondsText.textContent = "s";
-  el.appendChild(secondsText);
+	const secondsText = document.createElement("span");
+	secondsText.textContent = "s";
+	el.appendChild(secondsText);
 
-  return el;
+	return el;
 }
 
 function showCountdown(initialSeconds: number) {
-  log("Showing countdown overlay:", initialSeconds);
+	log("Showing countdown overlay:", initialSeconds);
 
-  if (!overlay) {
-    overlay = createOverlay();
-    document.body.appendChild(overlay);
-  }
+	if (!overlay) {
+		overlay = createOverlay();
+		document.body.appendChild(overlay);
+	}
 
-  let seconds = initialSeconds;
+	let seconds = initialSeconds;
 
-  if (countdownValue) {
-    countdownValue.textContent = String(seconds);
-  }
+	if (countdownValue) {
+		countdownValue.textContent = String(seconds);
+	}
 
-  if (countdownInterval) clearInterval(countdownInterval);
+	if (countdownInterval) clearInterval(countdownInterval);
 
-  countdownInterval = setInterval(() => {
-    seconds--;
-    if (countdownValue) {
-      countdownValue.textContent = String(seconds);
-    }
-    if (seconds <= 0) {
-      if (countdownInterval) clearInterval(countdownInterval);
-      hideCountdown();
-    }
-  }, 1000);
+	countdownInterval = setInterval(() => {
+		seconds--;
+		if (countdownValue) {
+			countdownValue.textContent = String(seconds);
+		}
+		if (seconds <= 0) {
+			if (countdownInterval) clearInterval(countdownInterval);
+			hideCountdown();
+		}
+	}, 1000);
 }
 
 function hideCountdown() {
-  log("Hiding countdown overlay");
-  if (countdownInterval) {
-    clearInterval(countdownInterval);
-    countdownInterval = null;
-  }
-  if (overlay) {
-    overlay.remove();
-    overlay = null;
-    countdownValue = null;
-  }
+	log("Hiding countdown overlay");
+	if (countdownInterval) {
+		clearInterval(countdownInterval);
+		countdownInterval = null;
+	}
+	if (overlay) {
+		overlay.remove();
+		overlay = null;
+		countdownValue = null;
+	}
 }
 
 // Listen for messages from background script
 interface BackgroundMessage {
-  showCountdown?: number;
-  hideCountdown?: boolean;
+	showCountdown?: number;
+	hideCountdown?: boolean;
 }
 
 browser.runtime.onMessage.addListener((msg: unknown) => {
-  if (typeof msg !== "object" || msg === null) return;
+	if (typeof msg !== "object" || msg === null) return;
 
-  const message = msg as BackgroundMessage;
+	const message = msg as BackgroundMessage;
 
-  if (message.showCountdown !== undefined && typeof message.showCountdown === "number") {
-    showCountdown(message.showCountdown);
-  }
+	if (message.showCountdown !== undefined && typeof message.showCountdown === "number") {
+		showCountdown(message.showCountdown);
+	}
 
-  if (message.hideCountdown === true) {
-    hideCountdown();
-  }
+	if (message.hideCountdown === true) {
+		hideCountdown();
+	}
 });
 
 log("Content script loaded");

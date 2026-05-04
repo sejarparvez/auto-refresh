@@ -1,15 +1,15 @@
-import type { Message, TabState } from "./types";
-import { log, warn, error } from "./logger";
+import { error, log, warn } from "./logger";
 import {
-	isActive,
-	isPaused,
-	toStorageState,
 	fromStorage,
-	isTabActive,
-	isTabPaused,
 	getDefaultInterval,
 	getTabCount,
+	isActive,
+	isPaused,
+	isTabActive,
+	isTabPaused,
+	toStorageState,
 } from "./state";
+import type { Message, TabState } from "./types";
 
 export function isMessage(msg: unknown): msg is Message {
 	return typeof msg === "object" && msg !== null && "action" in msg;
@@ -67,9 +67,7 @@ browser.runtime.onMessage.addListener((msg: unknown) => {
 			});
 
 			browser.alarms.clear("autoRefresh").then(() => {
-				const actualInterval = randomize
-					? jitteredInterval(clampedInterval)
-					: clampedInterval;
+				const actualInterval = randomize ? jitteredInterval(clampedInterval) : clampedInterval;
 				browser.alarms.create("autoRefresh", {
 					periodInMinutes: actualInterval / 60,
 				});
@@ -182,8 +180,7 @@ browser.alarms.onAlarm.addListener((alarm: browser.alarms.Alarm) => {
 				}
 
 				const tabState = data.tabStates?.[tabId];
-				const randomize =
-					typeof data.randomize === "boolean" ? data.randomize : false;
+				const randomize = typeof data.randomize === "boolean" ? data.randomize : false;
 				const baseInterval = tabState?.interval ?? data.defaultInterval ?? 60;
 				const currentCount = tabState?.count ?? 0;
 
@@ -200,12 +197,8 @@ browser.alarms.onAlarm.addListener((alarm: browser.alarms.Alarm) => {
 						log("Tab reloaded, count:", newCount);
 
 						// Notify content script of new countdown
-						const nextInterval = randomize
-							? jitteredInterval(baseInterval)
-							: baseInterval;
-						browser.tabs
-							.sendMessage(tabId, { showCountdown: nextInterval })
-							.catch(() => {});
+						const nextInterval = randomize ? jitteredInterval(baseInterval) : baseInterval;
+						browser.tabs.sendMessage(tabId, { showCountdown: nextInterval }).catch(() => {});
 
 						// Re-create alarm with jittered interval if randomize is on
 						if (randomize) {

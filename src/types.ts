@@ -19,4 +19,3 @@ export interface StorageState {
 	defaultInterval: number;
 	randomize: boolean;
 }
-
