@@ -153,7 +153,7 @@
   <div class="stats-row">
     <div class="stat-card">
       <div class="stat-lbl">Interval</div>
-      <div class="stat-val" id="statInterval">30s</div>
+      <div class="stat-val" id="statInterval">1m</div>
     </div>
     <div class="stat-card">
       <div class="stat-lbl">Refreshed</div>
@@ -168,16 +168,18 @@
     <div style="display:flex; align-items:center;">
       <div class="stepper-row">
         <button class="s-btn" id="sDec">−</button>
-        <input class="s-input" type="number" id="sVal" value="30" min="1">
+        <!-- default value updated from 30 to 60 to match MIN_INTERVAL -->
+        <input class="s-input" type="number" id="sVal" value="60" min="60">
         <button class="s-btn" id="sInc">+</button>
       </div>
       <span class="s-unit">seconds</span>
     </div>
+    <!-- Presets updated from 10s/30s/1m/5m → 1m/2m/5m/10m to reflect 60s minimum -->
     <div style="margin-top:10px;" class="presets" id="presets">
-      <button class="p-btn" data-v="10">10s</button>
-      <button class="p-btn active" data-v="30">30s</button>
-      <button class="p-btn" data-v="60">1m</button>
+      <button class="p-btn active" data-v="60">1m</button>
+      <button class="p-btn" data-v="120">2m</button>
       <button class="p-btn" data-v="300">5m</button>
+      <button class="p-btn" data-v="600">10m</button>
     </div>
   </div>
 

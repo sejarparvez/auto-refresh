@@ -1,6 +1,5 @@
 {
 	"name": "auto-refresh",
-	"module": "index.ts",
 	"type": "module",
 	"private": true,
 	"scripts": {

@@ -13,12 +13,23 @@ const tabName = document.getElementById("tabName")!;
 const tabBadge = document.getElementById("tabBadge")!;
 
 const CIRC = 251.2;
+const MIN_INTERVAL = 60; // Firefox alarm minimum is 1 minute
+
 let active = false;
-let interval = 30;
-let remaining = 30;
+let interval = MIN_INTERVAL;
+let remaining = MIN_INTERVAL;
 let count = 0;
 let currentTabId: number | null = null;
 let timer: ReturnType<typeof setInterval> | null = null;
+
+// Helper to avoid repeating slice(0, 30) everywhere
+function truncateTitle(title: string, maxLength = 30): string {
+	return title.slice(0, maxLength);
+}
+
+function formatInterval(secs: number): string {
+	return secs >= 60 ? secs / 60 + "m" : secs + "s";
+}
 
 function setRing(rem: number, total: number) {
 	const pct = total > 0 ? rem / total : 0;
@@ -30,19 +41,38 @@ function syncPresets() {
 	document.querySelectorAll<HTMLButtonElement>(".p-btn").forEach((b) => {
 		b.classList.toggle("active", parseInt(b.dataset.v!) === interval);
 	});
-	statInterval.textContent =
-		interval >= 60 ? interval / 60 + "m" : interval + "s";
+	statInterval.textContent = formatInterval(interval);
+}
+
+// Sync the popup countdown with the actual alarm's scheduled time
+function syncTimerWithAlarm() {
+	browser.alarms.get("autoRefresh").then((alarm) => {
+		if (alarm) {
+			const remainingMs = alarm.scheduledTime - Date.now();
+			remaining = Math.max(1, Math.ceil(remainingMs / 1000));
+		} else {
+			remaining = interval;
+		}
+		setRing(remaining, interval);
+	});
 }
 
 function startTimer() {
 	if (timer) clearInterval(timer);
-	remaining = interval;
-	setRing(remaining, interval);
+
+	// Sync with real alarm time instead of resetting to full interval
+	syncTimerWithAlarm();
+
 	timer = setInterval(() => {
 		remaining--;
 		if (remaining <= 0) {
-			count++;
-			statCount.textContent = String(count);
+			// Background handles the actual reload + count increment;
+			// we just reset the visual countdown here.
+			// Pull the latest count from storage to stay in sync.
+			browser.storage.local.get("count").then((data) => {
+				count = typeof data.count === "number" ? data.count : count;
+				statCount.textContent = String(count);
+			});
 			remaining = interval;
 		}
 		setRing(remaining, interval);
@@ -60,19 +90,15 @@ function setActive(on: boolean) {
 	active = on;
 	toggleTrack.classList.toggle("on", on);
 	spinIcon.classList.toggle("spinning", on);
-	hSub.textContent = on
-		? "every " + (interval >= 60 ? interval / 60 + "m" : interval + "s")
-		: "inactive";
-	tabBadge.textContent = on
-		? "on · " + (interval >= 60 ? interval / 60 + "m" : interval + "s")
-		: "off";
+	hSub.textContent = on ? "every " + formatInterval(interval) : "inactive";
+	tabBadge.textContent = on ? "on · " + formatInterval(interval) : "off";
 	tabBadge.className = "tab-badge " + (on ? "on" : "off");
 	if (on) startTimer();
 	else stopTimer();
 }
 
 function applyInterval(val: number) {
-	interval = Math.max(1, val);
+	interval = Math.max(MIN_INTERVAL, val);
 	sVal.value = String(interval);
 	syncPresets();
 	if (active && currentTabId !== null) {
@@ -80,8 +106,8 @@ function applyInterval(val: number) {
 			action: "start",
 			interval,
 			tabId: currentTabId,
-		} as Message);
-		browser.storage.local.set({ interval } as Partial<StorageState>);
+		});
+		browser.storage.local.set({ interval });
 		startTimer();
 	}
 }
@@ -89,38 +115,38 @@ function applyInterval(val: number) {
 toggleWrap.addEventListener("click", () => {
 	const next = !active;
 
-	if (next) {
-		browser.tabs.query({ active: true, currentWindow: true }).then((tabs) => {
-			const tabId = tabs[0]?.id;
-			if (tabId === undefined) return;
+		if (next) {
+			browser.tabs.query({ active: true, currentWindow: true }).then((tabs) => {
+				const tabId = tabs[0]?.id;
+				if (tabId === undefined) return;
 
-			currentTabId = tabId;
+				currentTabId = tabId;
 
-			if (tabs[0]?.title) {
-				tabName.textContent = tabs[0].title.slice(0, 30);
-			}
+				if (tabs[0]?.title) {
+					tabName.textContent = truncateTitle(tabs[0].title);
+				}
 
-			setActive(true);
-			browser.runtime.sendMessage({
-				action: "start",
-				interval,
-				tabId,
-			} as Message);
+				setActive(true);
+				browser.runtime.sendMessage({
+					action: "start",
+					interval,
+					tabId,
+				});
+				browser.storage.local.set({
+					active: true,
+					interval,
+					tabId,
+				});
+			});
+		} else {
+			currentTabId = null;
+			setActive(false);
+			browser.runtime.sendMessage({ action: "stop" });
 			browser.storage.local.set({
-				active: true,
-				interval,
-				tabId,
-			} as StorageState);
-		});
-	} else {
-		currentTabId = null;
-		setActive(false);
-		browser.runtime.sendMessage({ action: "stop" } as Message);
-		browser.storage.local.set({
-			active: false,
-			tabId: null,
-		} as Partial<StorageState>);
-	}
+				active: false,
+				tabId: null,
+			});
+		}
 });
 
 document
@@ -132,17 +158,20 @@ document
 
 sVal.addEventListener("input", () => {
 	const v = parseInt(sVal.value);
-	if (!isNaN(v) && v >= 1) applyInterval(v);
+	if (isNaN(v) || v < 1) return;
+	applyInterval(v);
 });
 
 document.querySelectorAll<HTMLButtonElement>(".p-btn").forEach((b) => {
 	b.addEventListener("click", () => applyInterval(parseInt(b.dataset.v!)));
 });
 
+// Initial tab title
 browser.tabs.query({ active: true, currentWindow: true }).then((tabs) => {
-	if (tabs[0]?.title) tabName.textContent = tabs[0].title.slice(0, 30);
+	if (tabs[0]?.title) tabName.textContent = truncateTitle(tabs[0].title);
 });
 
+// Restore state from storage on popup open
 browser.storage.local
 	.get(["interval", "active", "count", "tabId"])
 	.then((data: Partial<StorageState>) => {
@@ -159,9 +188,10 @@ browser.storage.local
 			browser.tabs
 				.get(data.tabId)
 				.then((tab) => {
-					if (tab?.title) tabName.textContent = tab.title.slice(0, 30);
+					if (tab?.title) tabName.textContent = truncateTitle(tab.title);
 				})
 				.catch(() => {
+					// Tab no longer exists
 					browser.storage.local.set({ active: false, tabId: null });
 				});
 		}
