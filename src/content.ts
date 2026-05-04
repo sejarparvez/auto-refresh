@@ -42,13 +42,15 @@ function createOverlay(): HTMLDivElement {
   return el;
 }
 
-function showCountdown(seconds: number) {
-  log("Showing countdown overlay:", seconds);
+function showCountdown(initialSeconds: number) {
+  log("Showing countdown overlay:", initialSeconds);
 
   if (!overlay) {
     overlay = createOverlay();
     document.body.appendChild(overlay);
   }
+
+  let seconds = initialSeconds;
 
   if (countdownValue) {
     countdownValue.textContent = String(seconds);
@@ -82,14 +84,21 @@ function hideCountdown() {
 }
 
 // Listen for messages from background script
+interface BackgroundMessage {
+  showCountdown?: number;
+  hideCountdown?: boolean;
+}
+
 browser.runtime.onMessage.addListener((msg: unknown) => {
   if (typeof msg !== "object" || msg === null) return;
 
-  if ("showCountdown" in msg && typeof (msg as any).showCountdown === "number") {
-    showCountdown((msg as any).showCountdown);
+  const message = msg as BackgroundMessage;
+
+  if (message.showCountdown !== undefined && typeof message.showCountdown === "number") {
+    showCountdown(message.showCountdown);
   }
 
-  if ("hideCountdown" in msg && (msg as any).hideCountdown === true) {
+  if (message.hideCountdown === true) {
     hideCountdown();
   }
 });

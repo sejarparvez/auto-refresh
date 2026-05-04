@@ -9,16 +9,12 @@ This file contains suggestions for further enhancing the Auto Refresh Tab Firefo
 ## 📦 Publishing to AMO (addons.mozilla.org)
 
 - [ ] **Add screenshots** - Take screenshots of the popup for the AMO listing
-- [ ] **Create `CONTRIBUTING.md`** - If open-sourcing the project, explain how others can contribute
-- [ ] **Add `LICENSE` file** - MIT or your preferred license (required for open source)
-- [ ] **Add `CHANGELOG.md`** - Track version changes and release notes
-- [ ] **Version bumping script** - Automate version updates in `manifest.json` and `package.json`
-- [ ] **AMO-specific metadata** - Add `homepage_url`, author info, and description in manifest.json:
-  ```json
-  "homepage_url": "https://github.com/yourusername/auto-refresh",
-  "author": "Your Name"
-  ```
-- [ ] **Privacy policy** - Required if publishing to AMO (even a simple one stating no data collection)
+- [x] **Create `CONTRIBUTING.md`** - Added with development setup and contribution guidelines
+- [x] **Add `LICENSE` file** - Added MIT License
+- [x] **Add `CHANGELOG.md`** - Added with version tracking
+- [x] **Version bumping script** - Added `bun run version:bump <patch|minor|major|version>`
+- [x] **AMO-specific metadata** - Added `homepage_url` and `author` in manifest.json
+- [x] **Privacy policy** - Added `PRIVACY.md` (no data collection policy)
 
 ---
 
@@ -31,18 +27,12 @@ This file contains suggestions for further enhancing the Auto Refresh Tab Firefo
 
 ## 🚀 Build & DevOps
 
-- [ ] **GitHub Actions CI** - Auto build, typecheck, and lint on PRs:
-  ```yaml
-  # .github/workflows/ci.yml
-  - name: Install dependencies
-    run: bun install
-  - name: Typecheck
-    run: bun run typecheck
-  - name: Build
-    run: bun run build
-  ```
-- [ ] **Automated AMO deployment** - Publish new versions automatically on GitHub releases using `web-ext`
-- [ ] **Source maps** - Add for debugging (remember to exclude from production builds)
+- [x] **GitHub Actions CI** - Auto build, typecheck, and lint on PRs (`.github/workflows/ci.yml`)
+- [x] **Automated AMO deployment** - Publish new versions automatically on GitHub releases (`.github/workflows/deploy-amo.yml`)
+- [x] **Source maps** - Added support via `SOURCE_MAPS=true` env var and production builds
+- [x] **Version bumping script** - Added `bun run version:bump <patch|minor|major|version>` command
+- [x] **Add linting** - Added Biome for linting and formatting
+- [x] **Add formatting** - Added Biome for consistent formatting
 
 
 ---

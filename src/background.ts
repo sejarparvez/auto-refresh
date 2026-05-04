@@ -1,4 +1,4 @@
-import type { Message } from "./types";
+import type { Message, TabState } from "./types";
 import { log, warn, error } from "./logger";
 import {
 	isActive,
@@ -107,7 +107,7 @@ browser.runtime.onMessage.addListener((msg: unknown) => {
 						remainingSec = Math.max(1, Math.ceil(remainingMs / 1000));
 					}
 
-					const tabStates: Record<number, any> = { ...(data.tabStates || {}) };
+					const tabStates: Record<number, TabState> = { ...(data.tabStates || {}) };
 					if (tabStates[tabId]) {
 						tabStates[tabId].paused = true;
 						if (remainingSec !== null) {
@@ -137,7 +137,7 @@ browser.runtime.onMessage.addListener((msg: unknown) => {
 			const interval = tabState?.interval ?? data.defaultInterval ?? 60;
 			const remaining = tabState?.remaining ?? interval;
 
-			const tabStates: Record<number, any> = { ...(data.tabStates || {}) };
+			const tabStates: Record<number, TabState> = { ...(data.tabStates || {}) };
 			if (tabStates[tabId]) {
 				tabStates[tabId].paused = false;
 				tabStates[tabId].remaining = null;
@@ -192,7 +192,7 @@ browser.alarms.onAlarm.addListener((alarm: browser.alarms.Alarm) => {
 					.then(() => {
 						// Only increment count after a successful reload
 						const newCount = currentCount + 1;
-						const tabStates: Record<number, any> = { ...(data.tabStates || {}) };
+						const tabStates: Record<number, TabState> = { ...(data.tabStates || {}) };
 						if (tabStates[tabId]) {
 							tabStates[tabId].count = newCount;
 						}

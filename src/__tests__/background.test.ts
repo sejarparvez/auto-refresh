@@ -84,8 +84,8 @@ describe("jitteredInterval", () => {
   test("should return a number within ±10% of base", () => {
     const base = 600;
     const runs = 1000;
-    let min = Infinity;
-    let max = -Infinity;
+    let min = Number.POSITIVE_INFINITY;
+    let max = Number.NEGATIVE_INFINITY;
 
     for (let i = 0; i < runs; i++) {
       const result = jitteredInterval(base);

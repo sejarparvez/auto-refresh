@@ -15,7 +15,7 @@ function createMockElement(tag = "div", id: string | null = null) {
     style: {} as Record<string, string>,
     dataset: {} as Record<string, string>,
     addEventListener: mock(() => {}),
-    querySelectorAll: mock(() => []) as any,
+    querySelectorAll: mock(() => []) as HTMLButtonElement[],
   };
   return el;
 }
@@ -63,7 +63,7 @@ function truncateTitle(title: string, maxLength = 30): string {
 }
 
 function formatInterval(secs: number): string {
-  return secs >= 60 ? secs / 60 + "m" : secs + "s";
+  return secs >= 60 ? `${secs / 60}m` : `${secs}s`;
 }
 
 const CIRC = 251.2;
@@ -130,12 +130,12 @@ describe("setRing", () => {
   test("should return 0 offset when remaining is 0", () => {
     const offset = setRing(0, 60);
     expect(offset).toBe((CIRC * (1 - 0)).toFixed(1));
-    expect(parseFloat(offset)).toBeCloseTo(CIRC);
+    expect(Number.parseFloat(offset)).toBeCloseTo(CIRC);
   });
 
   test("should return half circumference at 50%", () => {
     const offset = setRing(30, 60);
-    expect(parseFloat(offset)).toBeCloseTo(CIRC * 0.5);
+    expect(Number.parseFloat(offset)).toBeCloseTo(CIRC * 0.5);
   });
 
   test("should handle zero total", () => {
@@ -145,10 +145,10 @@ describe("setRing", () => {
 
   test("should calculate correct offset for various values", () => {
     // setRing returns toFixed(1), so we need to account for rounding
-    expect(parseFloat(setRing(45, 60))).toBeCloseTo(CIRC * 0.25, 1);
-    expect(parseFloat(setRing(15, 60))).toBeCloseTo(CIRC * 0.75, 1);
+    expect(Number.parseFloat(setRing(45, 60))).toBeCloseTo(CIRC * 0.25, 1);
+    expect(Number.parseFloat(setRing(15, 60))).toBeCloseTo(CIRC * 0.75, 1);
     // 59/60 ≈ 0.9833, so 1 - 0.9833 = 0.0167, CIRC * 0.0167 ≈ 4.2
-    expect(parseFloat(setRing(59, 60))).toBeCloseTo(4.2, 1);
+    expect(Number.parseFloat(setRing(59, 60))).toBeCloseTo(4.2, 1);
   });
 });
 

@@ -2,6 +2,9 @@ import { rmSync } from "fs";
 
 export {};
 
+const isProd = process.env.NODE_ENV === "production";
+const generateSourceMaps = process.env.SOURCE_MAPS === "true" || !isProd;
+
 // Clean dist directory before building to avoid stale files
 rmSync("./dist", { recursive: true, force: true });
 
@@ -9,7 +12,8 @@ const result = await Bun.build({
   entrypoints: ["./src/background.ts", "./src/popup.ts", "./src/content.ts"],
   outdir: "./dist",
   target: "browser",
-  minify: false,
+  minify: isProd,
+  sourcemap: generateSourceMaps ? "external" : undefined,
 });
 
 if (!result.success) {
@@ -20,4 +24,4 @@ if (!result.success) {
   process.exit(1);
 }
 
-console.log("✅ Build complete!");
+console.log(`✅ Build complete! (${isProd ? "production" : "development"})`);

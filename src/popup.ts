@@ -1,15 +1,15 @@
 import type { Message, StorageState, TabState } from "./types";
 
-const toggleWrap = document.getElementById("toggleWrap")!;
-const toggleTrack = document.getElementById("toggleTrack")!;
-const spinIcon = document.getElementById("spinIcon")!;
-const hSub = document.getElementById("hSub")!;
-const ringNum = document.getElementById("ringNum")!;
-const progressArc = document.getElementById("progressArc")!;
-const statInterval = document.getElementById("statInterval")!;
-const statCount = document.getElementById("statCount")!;
-const tabName = document.getElementById("tabName")!;
-const tabBadge = document.getElementById("tabBadge")!;
+const toggleWrap = document.getElementById("toggleWrap") as HTMLDivElement;
+const toggleTrack = document.getElementById("toggleTrack") as HTMLDivElement;
+const spinIcon = document.getElementById("spinIcon") as HTMLDivElement;
+const hSub = document.getElementById("hSub") as HTMLSpanElement;
+const ringNum = document.getElementById("ringNum") as HTMLSpanElement;
+const progressArc = document.getElementById("progressArc") as unknown as SVGCircleElement;
+const statInterval = document.getElementById("statInterval") as HTMLSpanElement;
+const statCount = document.getElementById("statCount") as HTMLSpanElement;
+const tabName = document.getElementById("tabName") as HTMLSpanElement;
+const tabBadge = document.getElementById("tabBadge") as HTMLSpanElement;
 const actionBtn = document.getElementById("actionBtn") as HTMLButtonElement;
 const randomizeToggle = document.getElementById(
 	"randomizeToggle",
@@ -33,7 +33,7 @@ function truncateTitle(title: string, maxLength = 30): string {
 }
 
 function formatInterval(secs: number): string {
-	return secs >= 60 ? secs / 60 + "m" : secs + "s";
+	return secs >= 60 ? `${secs / 60}m` : `${secs}s`;
 }
 
 function setRing(rem: number, total: number) {
@@ -42,18 +42,17 @@ function setRing(rem: number, total: number) {
 		"stroke-dashoffset",
 		(CIRC * (1 - pct)).toFixed(1),
 	);
-	ringNum.textContent = active ? rem + "s" : "—";
+	ringNum.textContent = active ? `${rem}s` : "—";
 }
 
 function syncPresets() {
-	document
-		.querySelectorAll<HTMLButtonElement>(".p-btn")
-		.forEach((b) => {
-			b.classList.toggle(
-				"active",
-				parseInt(b.dataset.v!) === interval,
-			);
-		});
+	const buttons = document.querySelectorAll<HTMLButtonElement>(".p-btn");
+	for (const b of buttons) {
+		b.classList.toggle(
+			"active",
+			Number.parseInt(b.dataset.v ?? "0") === interval,
+		);
+	}
 	statInterval.textContent = formatInterval(interval);
 }
 
@@ -137,12 +136,12 @@ function setActive(on: boolean, tabId: number | null = currentTabId) {
 	toggleTrack.classList.toggle("on", on);
 	spinIcon.classList.toggle("spinning", on);
 	hSub.textContent = on
-		? "every " + formatInterval(interval)
+		? `every ${formatInterval(interval)}`
 		: "inactive";
 	tabBadge.textContent = on
-		? "on · " + formatInterval(interval)
+		? `on · ${formatInterval(interval)}`
 		: "off";
-	tabBadge.className = "tab-badge " + (on ? "on" : "off");
+	tabBadge.className = `tab-badge ${on ? "on" : "off"}`;
 	updateActionButton();
 	updateBadge(tabId);
 	if (on) startTimer();
@@ -220,13 +219,12 @@ toggleWrap.addEventListener("click", () => {
 	}
 });
 
-document
-	.querySelectorAll<HTMLButtonElement>(".p-btn")
-	.forEach((b) => {
-		b.addEventListener("click", () =>
-			applyInterval(parseInt(b.dataset.v!)),
-		);
-	});
+const presetButtons = document.querySelectorAll<HTMLButtonElement>(".p-btn");
+for (const b of presetButtons) {
+	b.addEventListener("click", () =>
+		applyInterval(Number.parseInt(b.dataset.v ?? "0")),
+	);
+}
 
 actionBtn.addEventListener("click", () => {
 	if (!active) {
