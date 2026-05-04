@@ -27,8 +27,13 @@ jobs:
         run: |
           mkdir -p dist-package
           cp -r dist/* dist-package/
-          cp manifest.json popup.html -r icons/ -r fonts/ dist-package/
+          cp manifest.json popup.html icons/ fonts/ dist-package/
           cd dist-package && zip -r ../auto-refresh-${{ github.event.release.tag_name }}.zip .
+      
+      - name: Upload release asset
+        uses: softprops/action-gh-release@v2
+        with:
+          files: auto-refresh-${{ github.event.release.tag_name }}.zip
 
       - name: Sign and upload to AMO
         env:
