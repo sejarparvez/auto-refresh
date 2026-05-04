@@ -25,21 +25,21 @@ jobs:
 
       - name: Package extension correctly
         run: |
-          # Create a clean directory with ALL required files at the root
-          mkdir -p extension-package
-          cp manifest.json extension-package/
-          cp popup.html extension-package/
-          cp -r dist/* extension-package/
-          cp -r icons extension-package/
-          cp -r fonts extension-package/
-          # Verify manifest.json is at root
-          ls -la extension-package/
-          # Create zip from inside the directory
-          cd extension-package && zip -r ../auto-refresh-${{ github.event.release.tag_name }}.zip .
+          # Create the zip with ALL files at root level
+          # The zip must have manifest.json, popup.html, dist/, icons/, fonts/ at root
+          zip -r auto-refresh-${{ github.event.release.tag_name }}.zip \
+            manifest.json \
+            popup.html \
+            dist/ \
+            icons/ \
+            fonts/
 
       - name: Verify zip structure
         run: |
-          unzip -l auto-refresh-${{ github.event.release.tag_name }}.zip | head -20
+          echo "=== Zip contents ==="
+          unzip -l auto-refresh-${{ github.event.release.tag_name }}.zip
+          echo "=== Checking manifest.json is at root ==="
+          unzip -l auto-refresh-${{ github.event.release.tag_name }}.zip | grep "manifest.json"
 
       - name: Sign and upload to AMO
         # Only runs if AMO_API_KEY and AMO_API_SECRET are set
@@ -49,7 +49,7 @@ jobs:
           AMO_API_SECRET: ${{ secrets.AMO_API_SECRET }}
         run: |
           bunx web-ext sign \
-            --source-dir extension-package \
+            --source-file auto-refresh-${{ github.event.release.tag_name }}.zip \
             --artifacts-dir amo-artifacts \
             --api-key "$AMO_API_KEY" \
             --api-secret "$AMO_API_SECRET" \
