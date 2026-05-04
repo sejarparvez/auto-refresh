@@ -34,26 +34,18 @@ jobs:
           ls -la manifest.json popup.html
           ls dist/ icons/ fonts/
           
-          # Create zip - files will be at root of zip
-          # Using -j flag to junk paths (store only filenames)
-          # Actually, we need to cd into each dir and add files
+          # Create zip - this will put files at root level
+          # Using relative paths from workspace root
+          zip -r auto-refresh-${{ github.event.release.tag_name }}.zip \
+            manifest.json \
+            popup.html \
+            dist \
+            icons \
+            fonts
           
-          # Better approach: create temp dir and copy files there
-          mkdir -p /tmp/extension
-          cp manifest.json /tmp/extension/
-          cp popup.html /tmp/extension/
-          cp -r dist /tmp/extension/
-          cp -r icons /tmp/extension/
-          cp -r fonts /tmp/extension/
-          
-          # Create zip from temp dir
-          cd /tmp/extension
-          zip -r ${{ github.workspace }}/auto-refresh-${{ github.event.release.tag_name }}.zip .
-          
-          # Verify zip structure
+          # Verify zip structure - manifest.json should be at root
           echo "=== Zip contents (manifest.json should be at root) ==="
-          cd ${{ github.workspace }}
-          unzip -l auto-refresh-${{ github.event.release.tag_name }}.zip | head -20
+          unzip -l auto-refresh-${{ github.event.release.tag_name }}.zip | grep -E "manifest.json|popup.html|dist/|icons/|fonts/"
 
       - name: Sign and upload to AMO
         if: ${{ secrets.AMO_API_KEY != '' && secrets.AMO_API_SECRET != '' }}
