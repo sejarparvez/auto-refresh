@@ -30,7 +30,8 @@ jobs:
         run: |
           mkdir -p dist-package
           cp dist/background.js dist/content.js dist/popup.js dist-package/ 2>/dev/null || true
-          cp manifest.json popup.html icons/ fonts/ dist-package/
+          cp manifest.json popup.html dist-package/
+          cp -r icons/ fonts/ dist-package/
           cd dist-package && zip -r ../auto-refresh-${{ github.event.release.tag_name }}.zip .
       
       - name: Upload release asset
