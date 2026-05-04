@@ -23,22 +23,44 @@ jobs:
       - name: Build extension (production)
         run: bun run build:prod
 
-      - name: Package extension
+      - name: Package extension correctly
         run: |
-          mkdir -p dist-package
-          cp -r dist/* dist-package/
-          cp manifest.json popup.html dist-package/
-          cp -r icons/ fonts/ dist-package/
-          cd dist-package && zip -r ../auto-refresh-${{ github.event.release.tag_name }}.zip .
+          # Create a clean directory with ALL required files at the root
+          mkdir -p extension-package
+          cp manifest.json extension-package/
+          cp popup.html extension-package/
+          cp -r dist/* extension-package/
+          cp -r icons extension-package/
+          cp -r fonts extension-package/
+          # Verify manifest.json is at root
+          ls -la extension-package/
+          # Create zip from inside the directory
+          cd extension-package && zip -r ../auto-refresh-${{ github.event.release.tag_name }}.zip .
+
+      - name: Verify zip structure
+        run: |
+          unzip -l auto-refresh-${{ github.event.release.tag_name }}.zip | head -20
 
       - name: Sign and upload to AMO
+        # Only runs if AMO_API_KEY and AMO_API_SECRET are set
+        if: ${{ secrets.AMO_API_KEY != '' && secrets.AMO_API_SECRET != '' }}
         env:
           AMO_API_KEY: ${{ secrets.AMO_API_KEY }}
           AMO_API_SECRET: ${{ secrets.AMO_API_SECRET }}
         run: |
           bunx web-ext sign \
-            --source-dir dist-package \
+            --source-dir extension-package \
             --artifacts-dir amo-artifacts \
             --api-key "$AMO_API_KEY" \
             --api-secret "$AMO_API_SECRET" \
             --channel listed
+
+      - name: Manual upload reminder
+        if: ${{ secrets.AMO_API_KEY == '' || secrets.AMO_API_SECRET == '' }}
+        run: |
+          echo "::warning::AMO_API_KEY or AMO_API_SECRET not set. Please upload manually to AMO."
+          echo "1. Download the zip from the release assets"
+          echo "2. Go to https://addons.mozilla.org/en-US/developers/addon/submit/"
+          echo "3. Upload the zip file manually"
+          echo "4. After approval, add your extension ID to manifest.json"
+          echo "5. Add AMO_API_KEY and AMO_API_SECRET to GitHub secrets"
