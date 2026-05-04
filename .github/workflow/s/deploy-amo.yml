@@ -23,26 +23,30 @@ jobs:
       - name: Build extension (production)
         run: bun run build:prod
 
-      - name: Package extension correctly
+      - name: Create extension zip correctly
         run: |
-          # Create the zip with ALL files at root level
-          # The zip must have manifest.json, popup.html, dist/, icons/, fonts/ at root
-          zip -r auto-refresh-${{ github.event.release.tag_name }}.zip \
-            manifest.json \
-            popup.html \
-            dist/ \
-            icons/ \
-            fonts/
-
-      - name: Verify zip structure
-        run: |
+          # Create a clean directory with all files at root level
+          mkdir -p extension-build
+          cp manifest.json extension-build/
+          cp popup.html extension-build/
+          cp -r dist extension-build/
+          cp -r icons extension-build/
+          cp -r fonts extension-build/
+          
+          # Verify structure
+          echo "=== Extension build structure ==="
+          find extension-build -type f | head -20
+          
+          # Create zip from inside the directory to ensure files are at root
+          cd extension-build
+          zip -r ../auto-refresh-${{ github.event.release.tag_name }}.zip .
+          cd ..
+          
+          # Verify zip structure
           echo "=== Zip contents ==="
-          unzip -l auto-refresh-${{ github.event.release.tag_name }}.zip
-          echo "=== Checking manifest.json is at root ==="
-          unzip -l auto-refresh-${{ github.event.release.tag_name }}.zip | grep "manifest.json"
+          unzip -l auto-refresh-${{ github.event.release.tag_name }}.zip | head -20
 
       - name: Sign and upload to AMO
-        # Only runs if AMO_API_KEY and AMO_API_SECRET are set
         if: ${{ secrets.AMO_API_KEY != '' && secrets.AMO_API_SECRET != '' }}
         env:
           AMO_API_KEY: ${{ secrets.AMO_API_KEY }}
