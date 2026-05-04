@@ -23,29 +23,30 @@ jobs:
       - name: Build extension (production)
         run: bun run build:prod
 
-      - name: Create extension zip (correct structure)
+      - name: Create extension zip
         run: |
           # Create zip with ALL files at root level
-          # manifest.json, popup.html, dist/, icons/, fonts/ must be at zip root
+          # From workspace root, add files without path structure
           cd ${{ github.workspace }}
           
-          # Verify files exist
-          echo "=== Checking files ==="
-          ls -la manifest.json popup.html
-          ls dist/ icons/ fonts/
-          
-          # Create zip - this will put files at root level
-          # Using relative paths from workspace root
-          zip -r auto-refresh-${{ github.event.release.tag_name }}.zip \
+          # Create zip - files will be at root
+          # Using -j flag to junk paths (store without directory structure)
+          zip -r -j auto-refresh-${{ github.event.release.tag_name }}.zip \
             manifest.json \
             popup.html \
-            dist \
-            icons \
-            fonts
-          
-          # Verify zip structure - manifest.json should be at root
+            dist/background.js \
+            dist/popup.js \
+            dist/content.js \
+            icons/icon-16.png \
+            icons/icon-32.png \
+            icons/icon-48.png \
+            icons/icon-100.png \
+            fonts/Geist/Geist-VariableFont_wght.ttf
+
+      - name: Verify zip structure
+        run: |
           echo "=== Zip contents (manifest.json should be at root) ==="
-          unzip -l auto-refresh-${{ github.event.release.tag_name }}.zip | grep -E "manifest.json|popup.html|dist/|icons/|fonts/"
+          unzip -l auto-refresh-${{ github.event.release.tag_name }}.zip | head -20
 
       - name: Sign and upload to AMO
         if: ${{ secrets.AMO_API_KEY != '' && secrets.AMO_API_SECRET != '' }}
