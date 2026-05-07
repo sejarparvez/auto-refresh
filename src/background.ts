@@ -21,17 +21,7 @@ export function jitteredInterval(base: number): number {
 	return Math.round(base + (Math.random() * 2 - 1) * jitter);
 }
 
-// Clear any stale alarms on extension startup
-browser.runtime.onStartup.addListener(() => {
-	log("Extension startup: clearing stale alarms and state");
-	browser.alarms.clearAll();
-	browser.storage.local.set({
-		active: false,
-		currentTabId: null,
-	});
-});
-
-browser.runtime.onMessage.addListener((msg: unknown) => {
+export function handleMessage(msg: unknown): void {
 	if (!isMessage(msg)) return;
 
 	if (msg.action === "start") {
@@ -165,9 +155,9 @@ browser.runtime.onMessage.addListener((msg: unknown) => {
 			});
 		});
 	}
-});
+}
 
-browser.alarms.onAlarm.addListener((alarm: browser.alarms.Alarm) => {
+export function handleAlarm(alarm: browser.alarms.Alarm): void {
 	if (alarm.name === "autoRefresh") {
 		log("Alarm triggered");
 		browser.storage.local
@@ -222,4 +212,19 @@ browser.alarms.onAlarm.addListener((alarm: browser.alarms.Alarm) => {
 					});
 			});
 	}
-});
+}
+
+browser.runtime.onMessage.addListener(handleMessage);
+browser.alarms.onAlarm.addListener(handleAlarm);
+
+export function handleStartup(): void {
+	log("Extension startup: clearing stale alarms and state");
+	browser.alarms.clearAll();
+	browser.storage.local.set({
+		active: false,
+		currentTabId: null,
+	});
+}
+
+// Clear any stale alarms on extension startup
+browser.runtime.onStartup.addListener(handleStartup);

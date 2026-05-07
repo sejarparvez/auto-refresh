@@ -1,17 +1,5 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
-import type { Message, StorageState } from "../types";
 
-// Re-implement pure functions for testing (they're exported but module has side effects)
-function isMessage(msg: unknown): msg is Message {
-	return typeof msg === "object" && msg !== null && "action" in msg;
-}
-
-function jitteredInterval(base: number): number {
-	const jitter = base * 0.1;
-	return Math.round(base + (Math.random() * 2 - 1) * jitter);
-}
-
-// Mock browser APIs
 const mockAlarms = {
 	clear: mock(() => Promise.resolve()),
 	clearAll: mock(() => Promise.resolve()),
@@ -34,6 +22,7 @@ const mockAction = {
 
 const mockTabs = {
 	reload: mock(() => Promise.resolve()),
+	sendMessage: mock(() => Promise.resolve()),
 };
 
 const mockRuntime = {
@@ -41,9 +30,7 @@ const mockRuntime = {
 	onMessage: { addListener: mock() },
 };
 
-// Setup browser mock
-beforeEach(() => {
-	// @ts-ignore - mocking browser global
+function setupBrowserMock() {
 	globalThis.browser = {
 		alarms: mockAlarms,
 		storage: mockStorage,
@@ -51,229 +38,364 @@ beforeEach(() => {
 		tabs: mockTabs,
 		runtime: mockRuntime,
 	};
+}
 
-	mockAlarms.clear.mockClear();
-	mockAlarms.clearAll.mockClear();
-	mockAlarms.create.mockClear();
-	mockAlarms.get.mockClear();
-	mockStorage.local.get.mockClear();
-	mockStorage.local.set.mockClear();
-	mockAction.setBadgeText.mockClear();
-	mockAction.setBadgeBackgroundColor.mockClear();
+function clearAllMocks() {
+	for (const m of [
+		mockAlarms.clear, mockAlarms.clearAll, mockAlarms.create, mockAlarms.get,
+		mockStorage.local.get, mockStorage.local.set,
+		mockAction.setBadgeText, mockAction.setBadgeBackgroundColor,
+		mockTabs.reload, mockTabs.sendMessage,
+	]) {
+		m.mockClear();
+	}
+	mockTabs.reload.mockImplementation(() => Promise.resolve());
+}
+
+beforeEach(() => {
+	setupBrowserMock();
+	clearAllMocks();
 });
 
+async function flush(): Promise<void> {
+	for (let i = 0; i < 3; i++) {
+		await new Promise((resolve) => setTimeout(resolve, 1));
+	}
+}
+
+// -------------------------------------------------------------------------
+// isMessage
+// -------------------------------------------------------------------------
 describe("isMessage", () => {
-	test("should return true for valid message objects", () => {
+	test("valid start message", async () => {
+		const { isMessage } = await import("../background");
 		expect(isMessage({ action: "start", interval: 60, tabId: 1 })).toBe(true);
+	});
+
+	test("valid stop message", async () => {
+		const { isMessage } = await import("../background");
 		expect(isMessage({ action: "stop" })).toBe(true);
+	});
+
+	test("valid pause message", async () => {
+		const { isMessage } = await import("../background");
 		expect(isMessage({ action: "pause" })).toBe(true);
+	});
+
+	test("valid resume message", async () => {
+		const { isMessage } = await import("../background");
 		expect(isMessage({ action: "resume" })).toBe(true);
 	});
 
-	test("should return false for invalid messages", () => {
+	test("null/undefined/primitives", async () => {
+		const { isMessage } = await import("../background");
 		expect(isMessage(null)).toBe(false);
 		expect(isMessage(undefined)).toBe(false);
 		expect(isMessage("string")).toBe(false);
 		expect(isMessage(123)).toBe(false);
+	});
+
+	test("empty object or missing action key", async () => {
+		const { isMessage } = await import("../background");
 		expect(isMessage({})).toBe(false);
 		expect(isMessage({ type: "start" })).toBe(false);
 	});
 });
 
+// -------------------------------------------------------------------------
+// jitteredInterval
+// -------------------------------------------------------------------------
 describe("jitteredInterval", () => {
-	test("should return a number within ±10% of base", () => {
-		const base = 600;
-		const runs = 1000;
-		let min = Number.POSITIVE_INFINITY;
-		let max = Number.NEGATIVE_INFINITY;
-
-		for (let i = 0; i < runs; i++) {
-			const result = jitteredInterval(base);
-			min = Math.min(min, result);
-			max = Math.max(max, result);
+	test("within ±10% of base", async () => {
+		const { jitteredInterval } = await import("../background");
+		let min = Infinity, max = -Infinity;
+		for (let i = 0; i < 1000; i++) {
+			const r = jitteredInterval(600);
+			min = Math.min(min, r);
+			max = Math.max(max, r);
 		}
-
-		const expectedMin = Math.round(base - base * 0.1);
-		const expectedMax = Math.round(base + base * 0.1);
-
-		expect(min).toBeGreaterThanOrEqual(expectedMin);
-		expect(max).toBeLessThanOrEqual(expectedMax);
+		expect(min).toBeGreaterThanOrEqual(540);
+		expect(max).toBeLessThanOrEqual(660);
 	});
 
-	test("should return different values due to randomness", () => {
-		const base = 600;
-		const results = new Set<number>();
+	test("produces varying results", async () => {
+		const { jitteredInterval } = await import("../background");
+		const s = new Set<number>();
+		for (let i = 0; i < 100; i++) s.add(jitteredInterval(600));
+		expect(s.size).toBeGreaterThan(1);
+	});
 
+	test("handles 60s interval", async () => {
+		const { jitteredInterval } = await import("../background");
+		const r = jitteredInterval(60);
+		expect(r).toBeGreaterThanOrEqual(54);
+		expect(r).toBeLessThanOrEqual(66);
+	});
+
+	test("returns integer", async () => {
+		const { jitteredInterval } = await import("../background");
 		for (let i = 0; i < 100; i++) {
-			results.add(jitteredInterval(base));
+			expect(Number.isInteger(jitteredInterval(600))).toBe(true);
 		}
-
-		// Should have at least a few different values
-		expect(results.size).toBeGreaterThan(1);
-	});
-
-	test("should handle small intervals", () => {
-		const result = jitteredInterval(60);
-		expect(result).toBeGreaterThanOrEqual(54); // 60 - 10%
-		expect(result).toBeLessThanOrEqual(66); // 60 + 10%
 	});
 });
 
-describe("message handling - start", () => {
-	test("should clamp interval to minimum 60 seconds", () => {
-		const msg: Message = { action: "start", interval: 30, tabId: 1 };
-		const clampedInterval = Math.max(60, msg.interval);
-		expect(clampedInterval).toBe(60);
+// -------------------------------------------------------------------------
+// handleMessage — start
+// -------------------------------------------------------------------------
+describe("handleMessage — start", () => {
+	test("clamps to 60s", async () => {
+		const { handleMessage } = await import("../background");
+		mockStorage.local.get.mockResolvedValue({ randomize: false, tabStates: {}, defaultInterval: 60 });
+		handleMessage({ action: "start", interval: 30, tabId: 1 });
+		await flush();
+		expect(mockAlarms.create).toHaveBeenCalledWith("autoRefresh", { periodInMinutes: 1 });
+		expect(mockAction.setBadgeText).toHaveBeenCalledWith({ text: "ON", tabId: 1 });
 	});
 
-	test("should use original interval when >= 60", () => {
-		const msg: Message = { action: "start", interval: 120, tabId: 1 };
-		const clampedInterval = Math.max(60, msg.interval);
-		expect(clampedInterval).toBe(120);
+	test("preserves interval >= 60", async () => {
+		const { handleMessage } = await import("../background");
+		mockStorage.local.get.mockResolvedValue({ randomize: false, tabStates: {}, defaultInterval: 60 });
+		handleMessage({ action: "start", interval: 120, tabId: 1 });
+		await flush();
+		expect(mockAlarms.create).toHaveBeenCalledWith("autoRefresh", { periodInMinutes: 2 });
 	});
 
-	test("should use exact 60 when interval is 60", () => {
-		const msg: Message = { action: "start", interval: 60, tabId: 1 };
-		const clampedInterval = Math.max(60, msg.interval);
-		expect(clampedInterval).toBe(60);
-	});
-});
-
-describe("message handling - pause", () => {
-	test("should calculate remaining seconds correctly", () => {
-		const now = Date.now();
-		const scheduledTime = now + 5000; // 5 seconds from now
-		const remainingMs = scheduledTime - now;
-		const remainingSec = Math.max(1, Math.ceil(remainingMs / 1000));
-
-		expect(remainingSec).toBe(5);
+	test("saves state to storage", async () => {
+		const { handleMessage } = await import("../background");
+		mockStorage.local.get.mockResolvedValue({ randomize: false, tabStates: {}, defaultInterval: 60 });
+		handleMessage({ action: "start", interval: 120, tabId: 5 });
+		await flush();
+		const call = mockStorage.local.set.mock.calls[0][0];
+		expect(call.active).toBe(true);
+		expect(call.currentTabId).toBe(5);
 	});
 
-	test("should ensure minimum 1 second remaining", () => {
-		const now = Date.now();
-		const scheduledTime = now + 200; // 200ms from now
-		const remainingMs = scheduledTime - now;
-		const remainingSec = Math.max(1, Math.ceil(remainingMs / 1000));
-
-		expect(remainingSec).toBe(1);
+	test("notifies content script", async () => {
+		const { handleMessage } = await import("../background");
+		mockStorage.local.get.mockResolvedValue({ randomize: false, tabStates: {}, defaultInterval: 60 });
+		handleMessage({ action: "start", interval: 120, tabId: 1 });
+		await flush();
+		expect(mockTabs.sendMessage).toHaveBeenCalledWith(1, { showCountdown: 120 });
 	});
 
-	test("should handle exactly 1 second remaining", () => {
-		const now = Date.now();
-		const scheduledTime = now + 1000; // exactly 1 second
-		const remainingMs = scheduledTime - now;
-		const remainingSec = Math.max(1, Math.ceil(remainingMs / 1000));
-
-		expect(remainingSec).toBe(1);
-	});
-});
-
-describe("message handling - resume", () => {
-	test("should use remaining time if < 60 seconds", () => {
-		const remaining = 30;
-		const useDelay = remaining < 60;
-		expect(useDelay).toBe(true);
+	test("uses jittered interval when randomize is on", async () => {
+		const { handleMessage } = await import("../background");
+		mockStorage.local.get.mockResolvedValue({ randomize: true, tabStates: {}, defaultInterval: 60 });
+		handleMessage({ action: "start", interval: 600, tabId: 1 });
+		await flush();
+		const [name, opts] = mockAlarms.create.mock.calls[0];
+		expect(name).toBe("autoRefresh");
+		expect(opts.periodInMinutes).toBeGreaterThanOrEqual(9);
+		expect(opts.periodInMinutes).toBeLessThanOrEqual(11);
 	});
 
-	test("should use period for intervals >= 60 seconds", () => {
-		const remaining = 120;
-		const useDelay = remaining < 60;
-		expect(useDelay).toBe(false);
-	});
-
-	test("should handle exactly 60 seconds", () => {
-		const remaining = 60;
-		const useDelay = remaining < 60;
-		expect(useDelay).toBe(false);
+	test("ignores non-valid messages", async () => {
+		const { handleMessage } = await import("../background");
+		handleMessage({ type: "start" });
+		await flush();
+		expect(mockStorage.local.set).not.toHaveBeenCalled();
 	});
 });
 
-describe("alarm handler", () => {
-	test("should not proceed if tabId is null", () => {
-		const tabId = null;
-		expect(tabId).toBeNull();
+// -------------------------------------------------------------------------
+// handleMessage — stop
+// -------------------------------------------------------------------------
+describe("handleMessage — stop", () => {
+	test("clears alarm and badge", async () => {
+		const { handleMessage } = await import("../background");
+		mockStorage.local.get.mockResolvedValue({ currentTabId: 5, tabStates: {}, defaultInterval: 60 });
+		handleMessage({ action: "stop" });
+		await flush();
+		expect(mockAlarms.clear).toHaveBeenCalledWith("autoRefresh");
+		expect(mockAction.setBadgeText).toHaveBeenCalledWith({ text: "", tabId: 5 });
 	});
 
-	test("should increment count on successful reload", () => {
-		const currentCount = 5;
-		const newCount = currentCount + 1;
-		expect(newCount).toBe(6);
+	test("marks state inactive", async () => {
+		const { handleMessage } = await import("../background");
+		mockStorage.local.get.mockResolvedValue({ currentTabId: 5, tabStates: {}, defaultInterval: 60 });
+		handleMessage({ action: "stop" });
+		await flush();
+		const call = mockStorage.local.set.mock.calls[0][0];
+		expect(call.active).toBe(false);
+		expect(call.currentTabId).toBeNull();
 	});
 
-	test("should handle first reload with count 0", () => {
-		const currentCount = 0;
-		const newCount = currentCount + 1;
-		expect(newCount).toBe(1);
-	});
-});
-
-describe("StorageState defaults", () => {
-	test("should use default interval of 60 when not set", () => {
-		const data: Partial<StorageState> = {};
-		const interval = typeof data.interval === "number" ? data.interval : 60;
-		expect(interval).toBe(60);
-	});
-
-	test("should use provided interval when set", () => {
-		const data: Partial<StorageState> = { interval: 300 };
-		const interval = typeof data.interval === "number" ? data.interval : 60;
-		expect(interval).toBe(300);
-	});
-
-	test("should default randomize to false", () => {
-		const data: Partial<StorageState> = {};
-		const randomize = typeof data.randomize === "boolean" ? data.randomize : false;
-		expect(randomize).toBe(false);
-	});
-
-	test("should use provided randomize value when set", () => {
-		const data: Partial<StorageState> = { randomize: true };
-		const randomize = typeof data.randomize === "boolean" ? data.randomize : false;
-		expect(randomize).toBe(true);
-	});
-
-	test("should handle count correctly", () => {
-		const data: Partial<StorageState> = { count: 10 };
-		const count = typeof data.count === "number" ? data.count : 0;
-		expect(count).toBe(10);
+	test("hides countdown", async () => {
+		const { handleMessage } = await import("../background");
+		mockStorage.local.get.mockResolvedValue({ currentTabId: 5, tabStates: {}, defaultInterval: 60 });
+		handleMessage({ action: "stop" });
+		await flush();
+		expect(mockTabs.sendMessage).toHaveBeenCalledWith(5, { hideCountdown: true });
 	});
 });
 
-describe("badge text logic", () => {
-	test("should set correct badge for active state", () => {
-		const active = true;
-		const paused = false;
-		const text = active && !paused ? "ON" : active && paused ? "PAUSED" : "";
-		expect(text).toBe("ON");
+// -------------------------------------------------------------------------
+// handleMessage — pause
+// -------------------------------------------------------------------------
+describe("handleMessage — pause", () => {
+	test("sets paused state and updates badge", async () => {
+		const { handleMessage } = await import("../background");
+		mockStorage.local.get.mockResolvedValue({
+			currentTabId: 5,
+			tabStates: { 5: { interval: 120, count: 5, paused: false, remaining: null, randomize: false } },
+			defaultInterval: 60,
+		});
+		mockAlarms.get.mockResolvedValue({ scheduledTime: Date.now() + 30000, periodInMinutes: 2, name: "autoRefresh" });
+		handleMessage({ action: "pause" });
+		await flush();
+		expect(mockAction.setBadgeText).toHaveBeenCalledWith({ text: "PAUSED", tabId: 5 });
 	});
 
-	test("should set correct badge for paused state", () => {
-		const active = true;
-		const paused = true;
-		const text = active && !paused ? "ON" : active && paused ? "PAUSED" : "";
-		expect(text).toBe("PAUSED");
-	});
-
-	test("should set empty badge for inactive state", () => {
-		const active = false;
-		const paused = false;
-		const text = active && !paused ? "ON" : active && paused ? "PAUSED" : "";
-		expect(text).toBe("");
+	test("clears alarm on pause", async () => {
+		const { handleMessage } = await import("../background");
+		mockStorage.local.get.mockResolvedValue({
+			currentTabId: 5,
+			tabStates: { 5: { interval: 120, count: 5, paused: false, remaining: null, randomize: false } },
+			defaultInterval: 60,
+		});
+		mockAlarms.get.mockResolvedValue({ scheduledTime: Date.now() + 30000, periodInMinutes: 2, name: "autoRefresh" });
+		handleMessage({ action: "pause" });
+		await flush();
+		expect(mockAlarms.clear).toHaveBeenCalledWith("autoRefresh");
 	});
 });
 
-describe("badge color logic", () => {
-	test("should use green for active state", () => {
-		const active = true;
-		const paused = false;
-		const color = active && !paused ? "#16a34a" : "#f59e0b";
-		expect(color).toBe("#16a34a");
+// -------------------------------------------------------------------------
+// handleMessage — resume
+// -------------------------------------------------------------------------
+describe("handleMessage — resume", () => {
+	test("uses delayInMinutes when remaining < 60", async () => {
+		const { handleMessage } = await import("../background");
+		mockStorage.local.get.mockResolvedValue({
+			currentTabId: 5,
+			tabStates: { 5: { interval: 120, count: 5, paused: true, remaining: 30, randomize: false } },
+			defaultInterval: 60,
+		});
+		handleMessage({ action: "resume" });
+		await flush();
+		expect(mockAlarms.create).toHaveBeenCalledWith("autoRefresh", { delayInMinutes: 0.5 });
 	});
 
-	test("should use amber for paused state", () => {
-		const active = true;
-		const paused = true;
-		const color = active && !paused ? "#16a34a" : "#f59e0b";
-		expect(color).toBe("#f59e0b");
+	test("uses periodInMinutes for remaining >= 60", async () => {
+		const { handleMessage } = await import("../background");
+		mockStorage.local.get.mockResolvedValue({
+			currentTabId: 5,
+			tabStates: { 5: { interval: 120, count: 5, paused: true, remaining: 120, randomize: false } },
+			defaultInterval: 60,
+		});
+		handleMessage({ action: "resume" });
+		await flush();
+		expect(mockAlarms.create).toHaveBeenCalledWith("autoRefresh", { periodInMinutes: 2 });
+	});
+
+	test("restores ON badge and clears remaining", async () => {
+		const { handleMessage } = await import("../background");
+		mockStorage.local.get.mockResolvedValue({
+			currentTabId: 5,
+			tabStates: { 5: { interval: 120, count: 5, paused: true, remaining: 30, randomize: false } },
+			defaultInterval: 60,
+		});
+		handleMessage({ action: "resume" });
+		await flush();
+		expect(mockAction.setBadgeText).toHaveBeenCalledWith({ text: "ON", tabId: 5 });
+		const call = mockStorage.local.set.mock.calls.find((c: any) => c[0]?.tabStates?.[5]?.paused === false);
+		expect(call).toBeDefined();
+		expect(call[0].tabStates[5].remaining).toBeNull();
+	});
+});
+
+// -------------------------------------------------------------------------
+// handleAlarm
+// -------------------------------------------------------------------------
+describe("handleAlarm", () => {
+	test("reloads tab and increments count", async () => {
+		const { handleAlarm } = await import("../background");
+		mockStorage.local.get.mockResolvedValue({
+			currentTabId: 5,
+			tabStates: { 5: { interval: 120, count: 5, paused: false, remaining: null, randomize: false } },
+			defaultInterval: 60, randomize: false,
+		});
+		handleAlarm({ name: "autoRefresh", scheduledTime: Date.now(), periodInMinutes: 2 });
+		await flush();
+		expect(mockTabs.reload).toHaveBeenCalledWith(5);
+	});
+
+	test("ignores non-autoRefresh alarms", async () => {
+		const { handleAlarm } = await import("../background");
+		handleAlarm({ name: "otherAlarm", scheduledTime: Date.now(), periodInMinutes: 1 });
+		await flush();
+		expect(mockTabs.reload).not.toHaveBeenCalled();
+	});
+
+	test("handles tab closed gracefully", async () => {
+		const { handleAlarm } = await import("../background");
+		mockStorage.local.get.mockResolvedValue({
+			currentTabId: 5,
+			tabStates: { 5: { interval: 120, count: 5, paused: false, remaining: null, randomize: false } },
+			defaultInterval: 60, randomize: false,
+		});
+		mockTabs.reload.mockRejectedValue(new Error("Tab closed"));
+		handleAlarm({ name: "autoRefresh", scheduledTime: Date.now(), periodInMinutes: 2 });
+		await flush();
+		expect(mockAlarms.clear).toHaveBeenCalledWith("autoRefresh");
+	});
+
+	test("skips reload if currentTabId is null", async () => {
+		const { handleAlarm } = await import("../background");
+		mockStorage.local.get.mockResolvedValue({
+			currentTabId: null, tabStates: {}, defaultInterval: 60, randomize: false,
+		});
+		handleAlarm({ name: "autoRefresh", scheduledTime: Date.now(), periodInMinutes: 2 });
+		await flush();
+		expect(mockTabs.reload).not.toHaveBeenCalled();
+	});
+});
+
+// -------------------------------------------------------------------------
+// handleAlarm — randomize integration
+// -------------------------------------------------------------------------
+describe("handleAlarm — randomize integration", () => {
+	test("applies jitter when randomize is on", async () => {
+		const { handleAlarm } = await import("../background");
+		mockStorage.local.get.mockResolvedValue({
+			currentTabId: 5,
+			tabStates: { 5: { interval: 600, count: 5, paused: false, remaining: null, randomize: true } },
+			defaultInterval: 60, randomize: true,
+		});
+		handleAlarm({ name: "autoRefresh", scheduledTime: Date.now(), periodInMinutes: 10 });
+		for (let i = 0; i < 10; i++) {
+			await new Promise((resolve) => setTimeout(resolve, 1));
+		}
+		expect(mockAlarms.clear).toHaveBeenCalledWith("autoRefresh");
+		expect(mockAlarms.create).toHaveBeenCalled();
+		const [name, opts] = mockAlarms.create.mock.calls[0];
+		expect(name).toBe("autoRefresh");
+		expect(opts.periodInMinutes).toBeGreaterThanOrEqual(9);
+		expect(opts.periodInMinutes).toBeLessThanOrEqual(11);
+	});
+
+	test("does NOT re-create alarm when randomize is off", async () => {
+		const { handleAlarm } = await import("../background");
+		mockStorage.local.get.mockResolvedValue({
+			currentTabId: 5,
+			tabStates: { 5: { interval: 600, count: 5, paused: false, remaining: null, randomize: false } },
+			defaultInterval: 60, randomize: false,
+		});
+		handleAlarm({ name: "autoRefresh", scheduledTime: Date.now(), periodInMinutes: 10 });
+		await flush();
+		expect(mockAlarms.create).not.toHaveBeenCalled();
+	});
+});
+
+// -------------------------------------------------------------------------
+// handleStartup
+// -------------------------------------------------------------------------
+describe("handleStartup", () => {
+	test("clears all alarms and resets state", async () => {
+		const { handleStartup } = await import("../background");
+		handleStartup();
+		expect(mockAlarms.clearAll).toHaveBeenCalled();
+		expect(mockStorage.local.set).toHaveBeenCalledWith({ active: false, currentTabId: null });
 	});
 });

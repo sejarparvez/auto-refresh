@@ -7,7 +7,7 @@ let overlay: HTMLDivElement | null = null;
 let countdownValue: HTMLSpanElement | null = null;
 let countdownInterval: ReturnType<typeof setInterval> | null = null;
 
-function createOverlay(): HTMLDivElement {
+export function createOverlay(): HTMLDivElement {
 	const el = document.createElement("div");
 	el.id = "auto-refresh-overlay";
 	el.style.cssText = `
@@ -42,7 +42,7 @@ function createOverlay(): HTMLDivElement {
 	return el;
 }
 
-function showCountdown(initialSeconds: number) {
+export function showCountdown(initialSeconds: number) {
 	log("Showing countdown overlay:", initialSeconds);
 
 	if (!overlay) {
@@ -70,7 +70,7 @@ function showCountdown(initialSeconds: number) {
 	}, 1000);
 }
 
-function hideCountdown() {
+export function hideCountdown() {
 	log("Hiding countdown overlay");
 	if (countdownInterval) {
 		clearInterval(countdownInterval);

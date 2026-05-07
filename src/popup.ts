@@ -26,15 +26,15 @@ let currentTabId: number | null = null;
 let timer: ReturnType<typeof setInterval> | null = null;
 
 // Helper to avoid repeating slice(0, 30) everywhere
-function truncateTitle(title: string, maxLength = 30): string {
+export function truncateTitle(title: string, maxLength = 30): string {
 	return title.slice(0, maxLength);
 }
 
-function formatInterval(secs: number): string {
+export function formatInterval(secs: number): string {
 	return secs >= 60 ? `${secs / 60}m` : `${secs}s`;
 }
 
-function setRing(rem: number, total: number) {
+export function setRing(rem: number, total: number) {
 	const pct = total > 0 ? rem / total : 0;
 	progressArc.setAttribute("stroke-dashoffset", (CIRC * (1 - pct)).toFixed(1));
 	ringNum.textContent = active ? `${rem}s` : "—";
