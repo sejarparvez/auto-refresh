@@ -220,6 +220,12 @@
       <button class="p-btn" data-v="1500">25m</button>
       <button class="p-btn" data-v="1800">30m</button>
     </div>
+    <div class="stepper-row" style="margin-top:8px">
+      <button class="s-btn" id="stepDown">−</button>
+      <input type="number" class="s-input" id="customInterval" min="60" value="600" step="30">
+      <button class="s-btn" id="stepUp">+</button>
+      <span class="s-unit">sec</span>
+    </div>
   </div>
 
   <div class="tab-section">
@@ -233,7 +239,7 @@
   <button class="action-btn primary" id="actionBtn">Start</button>
 
   <div class="randomize-row">
-    <span>Randomize interval (±10%)</span>
+    <span title="Each refresh cycle picks a random interval within ±10% of the base, not just once at startup">Randomize interval (±10%)</span>
     <label class="switch">
       <input type="checkbox" id="randomizeToggle">
       <span class="slider"></span>

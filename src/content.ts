@@ -1,38 +1,54 @@
 import { log } from "./logger";
 
-// Content script for Auto Refresh Tab extension
-// Runs in the context of the web page
-
 let overlay: HTMLDivElement | null = null;
 let countdownValue: HTMLSpanElement | null = null;
 let countdownInterval: ReturnType<typeof setInterval> | null = null;
+let stylesInjected = false;
+
+const OVERLAY_CLASSES = "auto-refresh-overlay";
+const COUNTDOWN_CLASS = "auto-refresh-countdown";
+
+function injectStyles(): void {
+	if (stylesInjected) return;
+	const style = document.createElement("style");
+	style.id = "auto-refresh-styles";
+	style.textContent = `
+    .${OVERLAY_CLASSES} {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: rgba(0, 0, 0, 0.8);
+      color: white;
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-family: system-ui, sans-serif;
+      font-size: 14px;
+      z-index: 2147483647;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: opacity 0.3s;
+    }
+    .${COUNTDOWN_CLASS} {
+      font-weight: bold;
+    }
+  `;
+	document.documentElement.appendChild(style);
+	stylesInjected = true;
+}
 
 export function createOverlay(): HTMLDivElement {
+	injectStyles();
+
 	const el = document.createElement("div");
-	el.id = "auto-refresh-overlay";
-	el.style.cssText = `
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    background: rgba(0, 0, 0, 0.8);
-    color: white;
-    padding: 12px 16px;
-    border-radius: 8px;
-    font-family: system-ui, sans-serif;
-    font-size: 14px;
-    z-index: 2147483647;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    transition: opacity 0.3s;
-  `;
+	el.className = OVERLAY_CLASSES;
 
 	const text = document.createElement("span");
 	text.textContent = "Auto-refresh in ";
 	el.appendChild(text);
 
 	countdownValue = document.createElement("span");
-	countdownValue.style.fontWeight = "bold";
+	countdownValue.className = COUNTDOWN_CLASS;
 	el.appendChild(countdownValue);
 
 	const secondsText = document.createElement("span");
@@ -46,6 +62,10 @@ export function showCountdown(initialSeconds: number) {
 	log("Showing countdown overlay:", initialSeconds);
 
 	if (!overlay) {
+		if (!document.body) {
+			log("No document.body available, skipping overlay");
+			return;
+		}
 		overlay = createOverlay();
 		document.body.appendChild(overlay);
 	}

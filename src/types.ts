@@ -1,8 +1,8 @@
 export type Message =
 	| { action: "start"; interval: number; tabId: number }
-	| { action: "stop" }
-	| { action: "pause" }
-	| { action: "resume" };
+	| { action: "stop"; tabId: number }
+	| { action: "pause"; tabId: number }
+	| { action: "resume"; tabId: number };
 
 export interface TabState {
 	interval: number;

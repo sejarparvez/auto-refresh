@@ -11,10 +11,6 @@ export interface RefreshStatus {
 	randomize: boolean;
 }
 
-export function getState(status: RefreshStatus): RefreshState {
-	return status.state;
-}
-
 export function isActive(status: RefreshStatus): boolean {
 	return status.state === "ACTIVE" || status.state === "PAUSED";
 }

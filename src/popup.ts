@@ -12,6 +12,9 @@ const tabName = document.getElementById("tabName") as HTMLSpanElement;
 const tabBadge = document.getElementById("tabBadge") as HTMLSpanElement;
 const actionBtn = document.getElementById("actionBtn") as HTMLButtonElement;
 const randomizeToggle = document.getElementById("randomizeToggle") as HTMLInputElement;
+const customInterval = document.getElementById("customInterval") as HTMLInputElement;
+const stepDown = document.getElementById("stepDown") as HTMLButtonElement;
+const stepUp = document.getElementById("stepUp") as HTMLButtonElement;
 
 let paused = false;
 
@@ -27,7 +30,8 @@ let timer: ReturnType<typeof setInterval> | null = null;
 
 // Helper to avoid repeating slice(0, 30) everywhere
 export function truncateTitle(title: string, maxLength = 30): string {
-	return title.slice(0, maxLength);
+	if (title.length <= maxLength) return title;
+	return `${title.slice(0, maxLength)}...`;
 }
 
 export function formatInterval(secs: number): string {
@@ -45,12 +49,13 @@ function syncPresets() {
 	for (const b of buttons) {
 		b.classList.toggle("active", Number.parseInt(b.dataset.v ?? "0") === interval);
 	}
+	customInterval.value = String(interval);
 	statInterval.textContent = formatInterval(interval);
 }
 
-// Sync the popup countdown with the actual alarm's scheduled time
 function syncTimerWithAlarm() {
-	browser.alarms.get("autoRefresh").then((alarm) => {
+	if (currentTabId === null) return;
+	browser.alarms.get(`autoRefresh-${currentTabId}`).then((alarm) => {
 		if (alarm) {
 			const remainingMs = alarm.scheduledTime - Date.now();
 			remaining = Math.max(1, Math.ceil(remainingMs / 1000));
@@ -70,15 +75,16 @@ function startTimer() {
 	timer = setInterval(() => {
 		remaining--;
 		if (remaining <= 0) {
-			// Background handles the actual reload + count increment;
-			// we just reset the visual countdown here.
-			// Pull the latest count from storage to stay in sync.
-			browser.storage.local.get(["tabStates", "currentTabId"]).then((data) => {
-				if (currentTabId !== null && data.tabStates?.[currentTabId]) {
-					count = data.tabStates[currentTabId].count ?? count;
-				}
-				statCount.textContent = String(count);
-			});
+			const tabId = currentTabId;
+			browser.storage.local
+				.get(["tabStates", "currentTabId"])
+				.then((data) => {
+					if (tabId !== null && data.tabStates?.[tabId]) {
+						count = data.tabStates[tabId].count ?? count;
+					}
+					statCount.textContent = String(count);
+				})
+				.catch(() => {});
 			remaining = interval;
 		}
 		setRing(remaining, interval);
@@ -137,30 +143,34 @@ function setActive(on: boolean, tabId: number | null = currentTabId) {
 function applyInterval(val: number) {
 	interval = Math.max(MIN_INTERVAL, val);
 	syncPresets();
-	if (active && currentTabId !== null) {
+	const tabId = currentTabId;
+	if (active && tabId !== null) {
 		browser.runtime.sendMessage({
 			action: "start",
 			interval,
-			tabId: currentTabId,
+			tabId,
 		});
-		browser.storage.local.set({
-			tabStates: {
-				[currentTabId]: {
+		browser.storage.local
+			.get("tabStates")
+			.then((data) => {
+				const tabStates: Record<number, TabState> = { ...(data.tabStates || {}) };
+				tabStates[tabId] = {
 					interval,
 					count,
 					paused: false,
 					remaining: null,
 					randomize: randomizeToggle.checked,
-				},
-			},
-		});
+				};
+				browser.storage.local.set({ tabStates }).catch(() => {});
+			})
+			.catch(() => {});
 		startTimer();
 	}
 }
 
 randomizeToggle.addEventListener("change", () => {
 	const randomize = randomizeToggle.checked;
-	browser.storage.local.set({ randomize });
+	browser.storage.local.set({ randomize }).catch(() => {});
 	if (active && currentTabId !== null) {
 		// Restart with new randomize setting
 		browser.runtime.sendMessage({
@@ -191,21 +201,51 @@ toggleWrap.addEventListener("click", () => {
 				interval,
 				tabId,
 			});
-			browser.storage.local.set({
-				active: true,
-				currentTabId,
-				tabStates: {},
-			});
+			browser.storage.local
+				.get("tabStates")
+				.then((data) => {
+					const tabStates: Record<number, TabState> = { ...(data.tabStates || {}) };
+					if (!tabStates[tabId]) {
+						tabStates[tabId] = {
+							interval,
+							count: 0,
+							paused: false,
+							remaining: null,
+							randomize: randomizeToggle.checked,
+						};
+					}
+					browser.storage.local
+						.set({
+							active: true,
+							currentTabId: tabId,
+							tabStates,
+						})
+						.catch(() => {});
+				})
+				.catch(() => {});
 		});
 	} else {
 		const oldTabId = currentTabId;
 		currentTabId = null;
 		setActive(false, oldTabId);
-		browser.runtime.sendMessage({ action: "stop" });
-		browser.storage.local.set({
-			active: false,
-			currentTabId: null,
-		});
+		if (oldTabId !== null) {
+			browser.runtime.sendMessage({ action: "stop", tabId: oldTabId });
+			const removedTabId = oldTabId;
+			browser.storage.local
+				.get("tabStates")
+				.then((data) => {
+					const tabStates: Record<number, TabState> = { ...(data.tabStates || {}) };
+					delete tabStates[removedTabId];
+					const hasActive = Object.values(tabStates).some((s) => !s.paused);
+					browser.storage.local
+						.set({
+							active: hasActive,
+							tabStates,
+						})
+						.catch(() => {});
+				})
+				.catch(() => {});
+		}
 	}
 });
 
@@ -214,21 +254,45 @@ for (const b of presetButtons) {
 	b.addEventListener("click", () => applyInterval(Number.parseInt(b.dataset.v ?? "0")));
 }
 
+customInterval.addEventListener("change", () => {
+	const val = Number.parseInt(customInterval.value);
+	if (!Number.isNaN(val) && val >= MIN_INTERVAL) {
+		applyInterval(val);
+	}
+});
+
+customInterval.addEventListener("focus", () => customInterval.select());
+
+stepDown.addEventListener("click", () => {
+	const val = Number.parseInt(customInterval.value) || MIN_INTERVAL;
+	const next = Math.max(MIN_INTERVAL, val - 30);
+	customInterval.value = String(next);
+	applyInterval(next);
+});
+
+stepUp.addEventListener("click", () => {
+	const val = Number.parseInt(customInterval.value) || MIN_INTERVAL;
+	const next = val + 30;
+	customInterval.value = String(next);
+	applyInterval(next);
+});
+
 actionBtn.addEventListener("click", () => {
 	if (!active) {
-		// Start
 		toggleWrap.click();
 	} else if (paused) {
-		// Resume
 		paused = false;
-		browser.runtime.sendMessage({ action: "resume" });
+		if (currentTabId !== null) {
+			browser.runtime.sendMessage({ action: "resume", tabId: currentTabId });
+		}
 		startTimer();
 		updateBadge();
 		updateActionButton();
 	} else {
-		// Pause
 		paused = true;
-		browser.runtime.sendMessage({ action: "pause" });
+		if (currentTabId !== null) {
+			browser.runtime.sendMessage({ action: "pause", tabId: currentTabId });
+		}
 		stopTimer();
 		updateBadge();
 		updateActionButton();

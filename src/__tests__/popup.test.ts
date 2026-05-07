@@ -59,7 +59,8 @@ globalThis.browser = {
 
 // Re-implement pure functions for testing (they're not exported from popup.ts)
 function truncateTitle(title: string, maxLength = 30): string {
-	return title.slice(0, maxLength);
+	if (title.length <= maxLength) return title;
+	return `${title.slice(0, maxLength)}...`;
 }
 
 function formatInterval(secs: number): string {
@@ -79,20 +80,21 @@ describe("truncateTitle", () => {
 		expect(truncateTitle("Hello World")).toBe("Hello World");
 	});
 
-	test("should truncate title at maxLength", () => {
+	test("should truncate title at maxLength and add ellipsis", () => {
 		const longTitle = "A".repeat(50);
-		expect(truncateTitle(longTitle)).toBe("A".repeat(30));
-		expect(truncateTitle(longTitle).length).toBe(30);
+		expect(truncateTitle(longTitle)).toBe(`${"A".repeat(30)}...`);
+		expect(truncateTitle(longTitle).length).toBe(33);
 	});
 
 	test("should use default maxLength of 30", () => {
 		const longTitle = "B".repeat(100);
-		expect(truncateTitle(longTitle).length).toBe(30);
+		expect(truncateTitle(longTitle).length).toBe(33);
 	});
 
 	test("should accept custom maxLength", () => {
 		const longTitle = "C".repeat(100);
-		expect(truncateTitle(longTitle, 10).length).toBe(10);
+		expect(truncateTitle(longTitle, 10)).toBe(`${"C".repeat(10)}...`);
+		expect(truncateTitle(longTitle, 10).length).toBe(13);
 	});
 
 	test("should handle empty string", () => {

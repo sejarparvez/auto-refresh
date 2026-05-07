@@ -1,5 +1,4 @@
 import { describe, expect, test } from "bun:test";
-import type { StorageState, TabState } from "../types";
 import {
 	fromStorage,
 	getDefaultInterval,
@@ -11,44 +10,115 @@ import {
 	isTabPaused,
 	toStorageState,
 } from "../state";
+import type { StorageState, TabState } from "../types";
 
 describe("isActive", () => {
 	test("should return true for ACTIVE state", () => {
-		expect(isActive({ state: "ACTIVE", tabId: 1, interval: 60, count: 0, remaining: null, randomize: false })).toBe(true);
+		expect(
+			isActive({
+				state: "ACTIVE",
+				tabId: 1,
+				interval: 60,
+				count: 0,
+				remaining: null,
+				randomize: false,
+			}),
+		).toBe(true);
 	});
 
 	test("should return true for PAUSED state", () => {
-		expect(isActive({ state: "PAUSED", tabId: 1, interval: 60, count: 0, remaining: 30, randomize: false })).toBe(true);
+		expect(
+			isActive({
+				state: "PAUSED",
+				tabId: 1,
+				interval: 60,
+				count: 0,
+				remaining: 30,
+				randomize: false,
+			}),
+		).toBe(true);
 	});
 
 	test("should return false for STOPPED state", () => {
-		expect(isActive({ state: "STOPPED", tabId: null, interval: 60, count: 0, remaining: null, randomize: false })).toBe(false);
+		expect(
+			isActive({
+				state: "STOPPED",
+				tabId: null,
+				interval: 60,
+				count: 0,
+				remaining: null,
+				randomize: false,
+			}),
+		).toBe(false);
 	});
 });
 
 describe("isPaused", () => {
 	test("should return true for PAUSED state", () => {
-		expect(isPaused({ state: "PAUSED", tabId: 1, interval: 60, count: 0, remaining: 30, randomize: false })).toBe(true);
+		expect(
+			isPaused({
+				state: "PAUSED",
+				tabId: 1,
+				interval: 60,
+				count: 0,
+				remaining: 30,
+				randomize: false,
+			}),
+		).toBe(true);
 	});
 
 	test("should return false for ACTIVE state", () => {
-		expect(isPaused({ state: "ACTIVE", tabId: 1, interval: 60, count: 0, remaining: null, randomize: false })).toBe(false);
+		expect(
+			isPaused({
+				state: "ACTIVE",
+				tabId: 1,
+				interval: 60,
+				count: 0,
+				remaining: null,
+				randomize: false,
+			}),
+		).toBe(false);
 	});
 });
 
 describe("isStopped", () => {
 	test("should return true for STOPPED state", () => {
-		expect(isStopped({ state: "STOPPED", tabId: null, interval: 60, count: 0, remaining: null, randomize: false })).toBe(true);
+		expect(
+			isStopped({
+				state: "STOPPED",
+				tabId: null,
+				interval: 60,
+				count: 0,
+				remaining: null,
+				randomize: false,
+			}),
+		).toBe(true);
 	});
 
 	test("should return false for ACTIVE state", () => {
-		expect(isStopped({ state: "ACTIVE", tabId: 1, interval: 60, count: 0, remaining: null, randomize: false })).toBe(false);
+		expect(
+			isStopped({
+				state: "ACTIVE",
+				tabId: 1,
+				interval: 60,
+				count: 0,
+				remaining: null,
+				randomize: false,
+			}),
+		).toBe(false);
 	});
 });
 
 describe("toStorageState", () => {
 	test("should store per-tab state", () => {
-		const status = { state: "ACTIVE" as const, tabId: 5, interval: 120, count: 10, remaining: null, randomize: true };
+		const status = {
+			state: "ACTIVE" as const,
+			tabId: 5,
+			interval: 120,
+			count: 10,
+			remaining: null,
+			randomize: true,
+		};
 		const storage = toStorageState(status, 60);
 		expect(storage.active).toBe(true);
 		expect(storage.currentTabId).toBe(5);
@@ -63,21 +133,42 @@ describe("toStorageState", () => {
 		const existing: Record<number, TabState> = {
 			3: { interval: 300, count: 5, paused: false, remaining: null, randomize: false },
 		};
-		const status = { state: "ACTIVE" as const, tabId: 5, interval: 120, count: 10, remaining: null, randomize: true };
+		const status = {
+			state: "ACTIVE" as const,
+			tabId: 5,
+			interval: 120,
+			count: 10,
+			remaining: null,
+			randomize: true,
+		};
 		const storage = toStorageState(status, 60, existing);
 		expect(storage.tabStates[3].interval).toBe(300);
 		expect(storage.tabStates[5].interval).toBe(120);
 	});
 
 	test("should set paused=true when state is PAUSED", () => {
-		const status = { state: "PAUSED" as const, tabId: 5, interval: 120, count: 10, remaining: 30, randomize: false };
+		const status = {
+			state: "PAUSED" as const,
+			tabId: 5,
+			interval: 120,
+			count: 10,
+			remaining: 30,
+			randomize: false,
+		};
 		const storage = toStorageState(status, 60);
 		expect(storage.tabStates[5].paused).toBe(true);
 		expect(storage.tabStates[5].remaining).toBe(30);
 	});
 
 	test("should handle STOPPED state", () => {
-		const status = { state: "STOPPED" as const, tabId: null, interval: 60, count: 0, remaining: null, randomize: false };
+		const status = {
+			state: "STOPPED" as const,
+			tabId: null,
+			interval: 60,
+			count: 0,
+			remaining: null,
+			randomize: false,
+		};
 		const storage = toStorageState(status, 60);
 		expect(storage.active).toBe(false);
 		expect(storage.currentTabId).toBeNull();
@@ -85,7 +176,14 @@ describe("toStorageState", () => {
 	});
 
 	test("should set global randomize from status", () => {
-		const status = { state: "ACTIVE" as const, tabId: 1, interval: 60, count: 0, remaining: null, randomize: true };
+		const status = {
+			state: "ACTIVE" as const,
+			tabId: 1,
+			interval: 60,
+			count: 0,
+			remaining: null,
+			randomize: true,
+		};
 		const storage = toStorageState(status, 60);
 		expect(storage.randomize).toBe(true);
 	});
@@ -125,24 +223,40 @@ describe("fromStorage", () => {
 	});
 
 	test("should return STOPPED if tabId is null", () => {
-		const status = fromStorage({ active: true, currentTabId: 5, tabStates: {}, defaultInterval: 60, randomize: false }, null);
+		const status = fromStorage(
+			{ active: true, currentTabId: 5, tabStates: {}, defaultInterval: 60, randomize: false },
+			null,
+		);
 		expect(status.state).toBe("STOPPED");
 	});
 
 	test("should return STOPPED if not active", () => {
-		const status = fromStorage({ active: false, currentTabId: null, tabStates: {}, defaultInterval: 60, randomize: false }, 5);
+		const status = fromStorage(
+			{ active: false, currentTabId: null, tabStates: {}, defaultInterval: 60, randomize: false },
+			5,
+		);
 		expect(status.state).toBe("STOPPED");
 	});
 
 	test("should use default interval if tab not in tabStates", () => {
-		const status = fromStorage({ active: true, currentTabId: 5, tabStates: {}, defaultInterval: 300, randomize: false }, 5);
+		const status = fromStorage(
+			{ active: true, currentTabId: 5, tabStates: {}, defaultInterval: 300, randomize: false },
+			5,
+		);
 		expect(status.interval).toBe(300);
 	});
 });
 
 describe("round-trip: toStorageState → fromStorage", () => {
 	test("should preserve all fields for ACTIVE state", () => {
-		const original = { state: "ACTIVE" as const, tabId: 5, interval: 120, count: 10, remaining: null, randomize: true };
+		const original = {
+			state: "ACTIVE" as const,
+			tabId: 5,
+			interval: 120,
+			count: 10,
+			remaining: null,
+			randomize: true,
+		};
 		const storage = toStorageState(original, 60);
 		const restored = fromStorage(storage, 5);
 		expect(restored.state).toBe("ACTIVE");
@@ -153,7 +267,14 @@ describe("round-trip: toStorageState → fromStorage", () => {
 	});
 
 	test("should preserve all fields for PAUSED state", () => {
-		const original = { state: "PAUSED" as const, tabId: 5, interval: 120, count: 10, remaining: 45, randomize: false };
+		const original = {
+			state: "PAUSED" as const,
+			tabId: 5,
+			interval: 120,
+			count: 10,
+			remaining: 45,
+			randomize: false,
+		};
 		const storage = toStorageState(original, 60);
 		const restored = fromStorage(storage, 5);
 		expect(restored.state).toBe("PAUSED");
@@ -250,7 +371,9 @@ describe("isTabPaused", () => {
 		const data: Partial<StorageState> = {
 			active: true,
 			currentTabId: 5,
-			tabStates: { 5: { interval: 60, count: 0, paused: false, remaining: null, randomize: false } },
+			tabStates: {
+				5: { interval: 60, count: 0, paused: false, remaining: null, randomize: false },
+			},
 		};
 		expect(isTabPaused(data, 5)).toBe(false);
 	});
