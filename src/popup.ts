@@ -2,32 +2,36 @@ import type { StorageState, TabState } from "./types";
 
 const toggleWrap = document.getElementById("toggleWrap") as HTMLDivElement;
 const toggleTrack = document.getElementById("toggleTrack") as HTMLDivElement;
-const spinIcon = document.getElementById("spinIcon") as HTMLDivElement;
+const statusDot = document.getElementById("statusDot") as HTMLDivElement;
 const hSub = document.getElementById("hSub") as HTMLSpanElement;
 const ringNum = document.getElementById("ringNum") as HTMLSpanElement;
 const progressArc = document.getElementById("progressArc") as unknown as SVGCircleElement;
 const statInterval = document.getElementById("statInterval") as HTMLSpanElement;
 const statCount = document.getElementById("statCount") as HTMLSpanElement;
+const statNext = document.getElementById("statNext") as HTMLSpanElement;
 const tabName = document.getElementById("tabName") as HTMLSpanElement;
 const tabBadge = document.getElementById("tabBadge") as HTMLSpanElement;
 const actionBtn = document.getElementById("actionBtn") as HTMLButtonElement;
 const randomizeToggle = document.getElementById("randomizeToggle") as HTMLInputElement;
-const customInterval = document.getElementById("customInterval") as HTMLInputElement;
 const stepDown = document.getElementById("stepDown") as HTMLButtonElement;
 const stepUp = document.getElementById("stepUp") as HTMLButtonElement;
+const timeMins = document.getElementById("timeMins") as HTMLSpanElement;
+const timeSecs = document.getElementById("timeSecs") as HTMLSpanElement;
 
-const CIRC = 251.2;
+const CIRC = 175.9;
 const MIN_INTERVAL = 60;
+const MAX_INTERVAL = 7200; // 2 hours
+const STEP = 30;
 
 let active = false;
-let interval = MIN_INTERVAL; // base interval chosen by user
-let remaining = MIN_INTERVAL; // seconds left in current cycle
-let totalInterval = MIN_INTERVAL; // actual cycle length (may be jittered)
+let interval = MIN_INTERVAL;
+let remaining = MIN_INTERVAL;
+let totalInterval = MIN_INTERVAL;
 let count = 0;
 let currentTabId: number | null = null;
 let timer: ReturnType<typeof setInterval> | null = null;
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 export function truncateTitle(title: string, maxLength = 30): string {
 	if (title.length <= maxLength) return title;
@@ -35,32 +39,57 @@ export function truncateTitle(title: string, maxLength = 30): string {
 }
 
 export function formatInterval(secs: number): string {
-	if (secs >= 3600) return `${Math.round(secs / 3600)}h`;
+	if (secs >= 3600) {
+		const h = Math.floor(secs / 3600);
+		const m = Math.floor((secs % 3600) / 60);
+		return m > 0 ? `${h}h ${m}m` : `${h}h`;
+	}
 	if (secs >= 60) return `${Math.round(secs / 60)}m`;
 	return `${secs}s`;
 }
 
-function setRing(rem: number, total: number) {
-	const pct = total > 0 ? Math.min(1, rem / total) : 0;
-	progressArc.setAttribute("stroke-dashoffset", (CIRC * (1 - pct)).toFixed(1));
-	ringNum.textContent = active ? `${rem}s` : "—";
+export function formatRemaining(secs: number): string {
+	if (secs >= 60) return `${Math.floor(secs / 60)}m ${secs % 60}s`;
+	return `${secs}s`;
+}
+
+/** Snap a raw value to the nearest 30s step, clamped to [MIN, MAX]. */
+export function snapInterval(raw: number): number {
+	const snapped = Math.round(raw / STEP) * STEP;
+	return Math.max(MIN_INTERVAL, Math.min(MAX_INTERVAL, snapped));
+}
+
+function updateTimeDisplay(secs: number) {
+	const m = Math.floor(secs / 60);
+	const s = secs % 60;
+	timeMins.textContent = String(m);
+	timeSecs.textContent = String(s).padStart(2, "0");
+}
+
+function syncStepperButtons() {
+	stepDown.disabled = interval <= MIN_INTERVAL;
+	stepUp.disabled = interval >= MAX_INTERVAL;
 }
 
 function syncPresets() {
 	for (const b of document.querySelectorAll<HTMLButtonElement>(".p-btn")) {
 		b.classList.toggle("active", Number.parseInt(b.dataset.v ?? "0") === interval);
 	}
-	customInterval.value = String(interval);
-	statInterval.textContent = formatInterval(interval);
+	updateTimeDisplay(interval);
+	syncStepperButtons();
+	statInterval.textContent = active ? formatInterval(interval) : "—";
+}
+
+// ─── Ring ─────────────────────────────────────────────────────────────────────
+
+function setRing(rem: number, total: number) {
+	const pct = total > 0 ? Math.min(1, rem / total) : 0;
+	progressArc.setAttribute("stroke-dashoffset", (CIRC * (1 - pct)).toFixed(1));
+	ringNum.textContent = active ? formatRemaining(rem) : "—";
+	statNext.textContent = active ? formatRemaining(rem) : "—";
 }
 
 // ─── Timer ────────────────────────────────────────────────────────────────────
-//
-// Design: the setInterval ticks once per second and just decrements remaining.
-// When it reaches 0 we STOP the interval immediately (no more ticks), then do
-// a one-shot async reset. Once we have the new remaining/totalInterval from the
-// alarm we start a fresh interval. This prevents multiple concurrent alarm
-// queries and the "stuck at 1s" symptom they cause.
 
 function stopTimer() {
 	if (timer) {
@@ -69,10 +98,9 @@ function stopTimer() {
 	}
 	progressArc.setAttribute("stroke-dashoffset", String(CIRC));
 	ringNum.textContent = "—";
+	statNext.textContent = "—";
 }
 
-// Called once the alarm has fired and we know the next cycle's values.
-// Sets remaining + totalInterval then starts a fresh countdown.
 function resetAndStartTimer(newRemaining: number, newTotal: number) {
 	remaining = newRemaining;
 	totalInterval = newTotal;
@@ -80,10 +108,8 @@ function resetAndStartTimer(newRemaining: number, newTotal: number) {
 }
 
 function startTimer() {
-	// Always clear any existing timer first
 	if (timer) clearInterval(timer);
 
-	// Render immediately so the ring is correct before the first tick
 	setRing(remaining, totalInterval);
 
 	timer = setInterval(() => {
@@ -94,26 +120,20 @@ function startTimer() {
 			return;
 		}
 
-		// remaining has hit 0 — stop ticking RIGHT NOW so this branch
-		// only runs once and no further ticks pile up while we await the alarm.
-		// biome-ignore lint/style/noNonNullAssertion: <explanation>
+		// biome-ignore lint/style/noNonNullAssertion: cleared immediately
 		clearInterval(timer!);
 		timer = null;
 		setRing(0, totalInterval);
 
 		if (currentTabId === null) return;
 
-		// Poll until the alarm reappears with its new scheduledTime.
-		// The background reloads the tab then recreates the alarm, so there
-		// is a small window where get() returns undefined. We retry up to
-		// ~3 seconds before giving up and using totalInterval as a fallback.
 		let attempts = 0;
 		const MAX_ATTEMPTS = 6;
 		const RETRY_MS = 500;
 
 		function tryGetAlarm() {
 			const tabId = currentTabId;
-			if (tabId === null) return; // stopped while waiting
+			if (tabId === null) return;
 
 			browser.alarms
 				.get(`autoRefresh-${tabId}`)
@@ -121,21 +141,16 @@ function startTimer() {
 					if (alarm) {
 						const ms = alarm.scheduledTime - Date.now();
 						const newRemaining = Math.max(1, Math.ceil(ms / 1000));
-						// periodInMinutes is only set for fixed (non-randomized) alarms.
-						// Randomized alarms are one-shot (delayInMinutes), so we read
-						// the updated actualInterval from storage instead.
 						const newTotal = alarm.periodInMinutes
 							? Math.round(alarm.periodInMinutes * 60)
-							: newRemaining; // newRemaining already reflects the jittered delay
+							: newRemaining;
 
-						// Refresh count display while we're here
 						browser.storage.local
 							.get("tabStates")
 							.then((data) => {
 								if (currentTabId !== null && data.tabStates?.[currentTabId]) {
 									count = data.tabStates[currentTabId].count ?? count;
 									statCount.textContent = String(count);
-									// Update header to show the current cycle's actual interval
 									const actual = data.tabStates[currentTabId].actualInterval;
 									if (actual) {
 										hSub.textContent = `every ${formatInterval(actual)}`;
@@ -151,7 +166,6 @@ function startTimer() {
 						if (attempts < MAX_ATTEMPTS) {
 							setTimeout(tryGetAlarm, RETRY_MS);
 						} else {
-							// Alarm never came back — fall back to full interval
 							resetAndStartTimer(totalInterval, totalInterval);
 						}
 					}
@@ -166,8 +180,6 @@ function startTimer() {
 				});
 		}
 
-		// Give the background a brief head-start before the first query
-		// (it needs to reload the tab and recreate the alarm)
 		setTimeout(tryGetAlarm, 300);
 	}, 1000);
 }
@@ -175,18 +187,19 @@ function startTimer() {
 // ─── UI state ─────────────────────────────────────────────────────────────────
 
 function updateActionButton() {
-	actionBtn.textContent = active ? "Stop" : "Start";
-	actionBtn.className = active ? "action-btn secondary" : "action-btn primary";
+	actionBtn.textContent = active ? "Stop refreshing" : "Start refreshing";
+	actionBtn.className = active ? "action-btn stop" : "action-btn";
 }
 
 function setActiveUI(on: boolean, actualSecs?: number) {
 	active = on;
 	toggleTrack.classList.toggle("on", on);
-	spinIcon.classList.toggle("spinning", on);
+	statusDot.classList.toggle("on", on);
 	const displayInterval = actualSecs ?? interval;
 	hSub.textContent = on ? `every ${formatInterval(displayInterval)}` : "inactive";
 	tabBadge.textContent = on ? `on · ${formatInterval(displayInterval)}` : "off";
-	tabBadge.className = `tab-badge ${on ? "on" : "off"}`;
+	tabBadge.className = `tab-badge ${on ? "on" : ""}`;
+	statInterval.textContent = on ? formatInterval(interval) : "—";
 	updateActionButton();
 	if (!on) stopTimer();
 }
@@ -199,8 +212,6 @@ async function startRefresh(tabId: number, tabTitle?: string) {
 
 	setActiveUI(true);
 
-	// Wait for background to return the actual (possibly jittered) interval
-	// before we touch remaining/totalInterval or call startTimer.
 	let actualInterval = interval;
 	try {
 		const response = (await browser.runtime.sendMessage({
@@ -217,12 +228,10 @@ async function startRefresh(tabId: number, tabTitle?: string) {
 
 	totalInterval = actualInterval;
 	remaining = actualInterval;
-	// Update the header to show the actual (possibly jittered) interval
 	hSub.textContent = `every ${formatInterval(actualInterval)}`;
 	tabBadge.textContent = `on · ${formatInterval(actualInterval)}`;
-	startTimer(); // called exactly once, after values are final
+	startTimer();
 
-	// Persist correct actualInterval to storage
 	try {
 		const data = await browser.storage.local.get("tabStates");
 		const tabStates: Record<number, TabState> = { ...(data.tabStates || {}) };
@@ -260,23 +269,10 @@ function stopRefresh() {
 	}
 }
 
-// ─── Event listeners ──────────────────────────────────────────────────────────
-
-async function handleToggle() {
-	if (!active) {
-		const tabs = await browser.tabs.query({ active: true, currentWindow: true });
-		const tab = tabs[0];
-		if (tab?.id !== undefined) await startRefresh(tab.id, tab.title);
-	} else {
-		stopRefresh();
-	}
-}
-
-toggleWrap.addEventListener("click", handleToggle);
-actionBtn.addEventListener("click", handleToggle);
+// ─── Interval application ─────────────────────────────────────────────────────
 
 async function applyInterval(val: number) {
-	interval = Math.max(MIN_INTERVAL, val);
+	interval = snapInterval(val);
 	syncPresets();
 
 	if (active && currentTabId !== null) {
@@ -299,27 +295,31 @@ async function applyInterval(val: number) {
 	}
 }
 
+// ─── Event listeners ──────────────────────────────────────────────────────────
+
+async function handleToggle() {
+	if (!active) {
+		const tabs = await browser.tabs.query({ active: true, currentWindow: true });
+		const tab = tabs[0];
+		if (tab?.id !== undefined) await startRefresh(tab.id, tab.title);
+	} else {
+		stopRefresh();
+	}
+}
+
+toggleWrap.addEventListener("click", handleToggle);
+actionBtn.addEventListener("click", handleToggle);
+
+// Preset buttons
 for (const b of document.querySelectorAll<HTMLButtonElement>(".p-btn")) {
 	b.addEventListener("click", () => applyInterval(Number.parseInt(b.dataset.v ?? "0")));
 }
 
-customInterval.addEventListener("change", () => {
-	const val = Number.parseInt(customInterval.value);
-	if (!Number.isNaN(val) && val >= MIN_INTERVAL) applyInterval(val);
-});
+// Stepper buttons — step by 30s, clamped by applyInterval → snapInterval
+stepDown.addEventListener("click", () => applyInterval(interval - STEP));
+stepUp.addEventListener("click", () => applyInterval(interval + STEP));
 
-customInterval.addEventListener("focus", () => customInterval.select());
-
-stepDown.addEventListener("click", () => {
-	const val = Number.parseInt(customInterval.value) || MIN_INTERVAL;
-	applyInterval(Math.max(MIN_INTERVAL, val - 30));
-});
-
-stepUp.addEventListener("click", () => {
-	const val = Number.parseInt(customInterval.value) || MIN_INTERVAL;
-	applyInterval(val + 30);
-});
-
+// Randomize toggle
 randomizeToggle.addEventListener("change", async () => {
 	const randomize = randomizeToggle.checked;
 	browser.storage.local.set({ randomize }).catch(() => {});
@@ -372,15 +372,17 @@ browser.commands?.onCommand.addListener((command) => {
 		"randomize",
 	])) as StorageData;
 
-	if (data.defaultInterval) interval = data.defaultInterval;
-	if (data.tabStates?.[tabId]?.interval) interval = data.tabStates[tabId].interval;
+	if (data.defaultInterval) interval = snapInterval(data.defaultInterval);
+	if (data.tabStates?.[tabId]?.interval) interval = snapInterval(data.tabStates[tabId].interval);
 
 	totalInterval = data.tabStates?.[tabId]?.actualInterval ?? interval;
 
 	count = data.tabStates?.[tabId]?.count ?? 0;
 	statCount.textContent = String(count);
 
-	if (typeof data.randomize === "boolean") randomizeToggle.checked = data.tabStates?.[tabId]?.randomize ?? data.randomize;
+	if (typeof data.randomize === "boolean") {
+		randomizeToggle.checked = data.tabStates?.[tabId]?.randomize ?? data.randomize;
+	}
 
 	syncPresets();
 
@@ -391,21 +393,18 @@ browser.commands?.onCommand.addListener((command) => {
 		active = true;
 
 		toggleTrack.classList.add("on");
-		spinIcon.classList.add("spinning");
+		statusDot.classList.add("on");
 		hSub.textContent = `every ${formatInterval(totalInterval)}`;
 		tabBadge.textContent = `on · ${formatInterval(totalInterval)}`;
 		tabBadge.className = "tab-badge on";
+		statInterval.textContent = formatInterval(interval);
 		updateActionButton();
 
-		// Read the live alarm for the precise time remaining
 		const alarm = await browser.alarms.get(`autoRefresh-${tabId}`).catch(() => undefined);
 
 		if (alarm) {
 			const ms = alarm.scheduledTime - Date.now();
 			remaining = Math.max(1, Math.ceil(ms / 1000));
-			// periodInMinutes only exists for fixed alarms. Randomized alarms use
-			// delayInMinutes (one-shot), so totalInterval stays as the stored
-			// actualInterval which the background already updated.
 			if (alarm.periodInMinutes) {
 				totalInterval = Math.round(alarm.periodInMinutes * 60);
 			}
@@ -418,10 +417,10 @@ browser.commands?.onCommand.addListener((command) => {
 		active = false;
 		currentTabId = null;
 		toggleTrack.classList.remove("on");
-		spinIcon.classList.remove("spinning");
+		statusDot.classList.remove("on");
 		hSub.textContent = "inactive";
 		tabBadge.textContent = "off";
-		tabBadge.className = "tab-badge off";
+		tabBadge.className = "tab-badge";
 		updateActionButton();
 		stopTimer();
 	}

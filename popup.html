@@ -14,163 +14,284 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      width: 270px;
-      padding: 20px;
+      width: 260px;
+      padding: 16px;
       font-family: 'Geist', sans-serif;
       background: var(--bg, #ffffff);
       color: var(--tx, #111111);
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
     }
 
     @media (prefers-color-scheme: dark) {
-      body { --bg: #111111; --tx: #f0f0f0; --surface: #1c1c1c; --border: #2a2a2a; --muted: #888; --success: #4ade80; --success-bg: rgba(74,222,128,0.12); }
+      body {
+        --bg: #111111;
+        --tx: #f0f0f0;
+        --surface: #1c1c1c;
+        --surface2: #242424;
+        --border: #2a2a2a;
+        --border2: #333333;
+        --muted: #888;
+        --success: #4ade80;
+        --success-bg: rgba(74,222,128,0.12);
+        --success-border: rgba(74,222,128,0.2);
+        --danger: #f87171;
+        --danger-bg: rgba(248,113,113,0.08);
+        --danger-border: rgba(248,113,113,0.2);
+      }
     }
     @media (prefers-color-scheme: light) {
-      body { --bg: #ffffff; --tx: #111111; --surface: #f5f5f5; --border: #e0e0e0; --muted: #999; --success: #16a34a; --success-bg: rgba(22,163,74,0.1); }
+      body {
+        --bg: #ffffff;
+        --tx: #111111;
+        --surface: #f5f5f5;
+        --surface2: #efefef;
+        --border: #e0e0e0;
+        --border2: #d0d0d0;
+        --muted: #999;
+        --success: #16a34a;
+        --success-bg: rgba(22,163,74,0.1);
+        --success-border: rgba(22,163,74,0.2);
+        --danger: #dc2626;
+        --danger-bg: rgba(220,38,38,0.04);
+        --danger-border: rgba(220,38,38,0.2);
+      }
     }
 
-    .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
-    .header-left { display: flex; align-items: center; gap: 10px; }
-    .icon-ring {
-      width: 34px; height: 34px; border-radius: 50%;
-      background: var(--surface); border: 1px solid var(--border);
-      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    /* ── Header ── */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
     }
-    .spin-icon { color: var(--tx); }
-    .spinning { animation: spin 2s linear infinite; transform-origin: center; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .h-title { font-size: 14px; font-weight: 600; color: var(--tx); }
-    .h-sub { font-size: 11px; color: var(--muted); margin-top: 1px; font-family: 'Geist', monospace; }
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+    }
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--border2);
+      flex-shrink: 0;
+      transition: background 0.3s;
+    }
+    .status-dot.on { background: var(--success); }
+    .h-title { font-size: 13px; font-weight: 600; color: var(--tx); }
+    .h-sub { font-size: 11px; color: var(--muted); margin-top: 1px; }
 
+    /* ── Main toggle ── */
     .toggle-wrap { cursor: pointer; }
     .toggle-track {
-      width: 44px; height: 24px; border-radius: 12px;
-      background: var(--border); border: 1px solid var(--border);
-      position: relative; transition: background 0.25s;
+      width: 40px; height: 22px;
+      border-radius: 11px;
+      background: var(--surface);
+      border: 1px solid var(--success-border);
+      position: relative;
+      transition: background 0.25s, border-color 0.25s;
     }
     .toggle-track.on { background: var(--success); border-color: var(--success); }
     .toggle-thumb {
-      position: absolute; top: 3px; left: 3px;
-      width: 18px; height: 18px; border-radius: 50%;
-      background: var(--bg); transition: transform 0.25s cubic-bezier(.4,0,.2,1);
+      position: absolute;
+      top: 3px; left: 3px;
+      width: 16px; height: 16px;
+      border-radius: 50%;
+      background: var(--bg);
+      transition: transform 0.25s cubic-bezier(.4,0,.2,1);
     }
-    .toggle-track.on .toggle-thumb { transform: translateX(20px); }
+    .toggle-track.on .toggle-thumb { transform: translateX(18px); }
 
-    .ring-wrap { display: flex; justify-content: center; margin-bottom: 14px; }
-    .ring-num { font-family: 'Geist', monospace; font-size: 22px; font-weight: 500; fill: var(--tx, #111); }
-    .ring-sub { font-size: 10px; fill: var(--muted, #999); font-family: 'Geist', sans-serif; }
+    /* ── Divider ── */
+    .divider { height: 1px; background: var(--border); }
+
+    /* ── Ring + stats ── */
+    .ring-section { display: flex; align-items: center; gap: 14px; }
+    .ring-num { font-family: 'Geist', monospace; font-size: 14px; font-weight: 500; fill: var(--tx, #111); }
     .ring-track { stroke: var(--border, #e0e0e0); }
     .ring-progress { stroke: var(--success, #16a34a); transition: stroke-dashoffset 1s linear; }
 
-    .stats-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
-    .stat-card { background: var(--surface); border-radius: 8px; padding: 10px 12px; }
-    .stat-lbl { font-size: 10px; color: var(--muted); font-weight: 500; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 4px; }
-    .stat-val { font-family: 'Geist', monospace; font-size: 20px; font-weight: 500; color: var(--tx); }
+    .ring-stats { display: flex; flex-direction: column; gap: 6px; flex: 1; }
+    .stat-row { display: flex; align-items: baseline; justify-content: space-between; }
+    .stat-lbl { font-size: 11px; color: var(--muted); }
+    .stat-val { font-family: 'Geist', monospace; font-size: 13px; font-weight: 500; color: var(--tx); }
 
-    .divider { height: 1px; background: var(--border); margin: 14px 0; }
-
-    .interval-block { background: var(--surface); border-radius: 12px; padding: 12px 14px; margin-bottom: 12px; }
-    .interval-lbl { font-size: 10px; font-weight: 600; color: var(--muted); letter-spacing: 0.6px; text-transform: uppercase; margin-bottom: 10px; }
-
-    .stepper-row { display: flex; align-items: center; gap: 0; margin-bottom: 10px; }
-    .s-btn {
-      width: 30px; height: 30px;
-      border: 1px solid var(--border);
-      background: var(--bg);
-      color: var(--tx);
-      font-size: 18px; cursor: pointer;
-      display: flex; align-items: center; justify-content: center;
-      transition: background 0.1s; line-height: 1;
+    /* ── Section label ── */
+    .section-label {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.6px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 7px;
     }
-    .s-btn:first-child { border-radius: 6px 0 0 6px; }
-    .s-btn:last-child  { border-radius: 0 6px 6px 0; }
-    .s-btn:hover { background: var(--surface); }
-    .s-btn:active { transform: scale(0.94); }
-    .s-input {
-      font-family: 'DM Mono', monospace; font-size: 15px; font-weight: 500;
-      color: var(--tx); background: var(--bg);
-      border: 1px solid var(--border); border-left: none; border-right: none;
-      outline: none; width: 50px; text-align: center; padding: 4px 0;
-      -moz-appearance: textfield;
-    }
-    .s-input::-webkit-inner-spin-button,
-    .s-input::-webkit-outer-spin-button { -webkit-appearance: none; }
-    .s-unit { font-size: 12px; color: var(--muted); margin-left: 8px; }
 
-    .presets { display: flex; flex-wrap: wrap; gap: 5px; }
+    /* ── Presets ── */
+    .presets { display: flex; flex-wrap: wrap; gap: 4px; }
     .p-btn {
-      flex: 0 0 auto; min-width: 36px; font-family: 'Geist', monospace; font-size: 10px;
-      padding: 5px 8px; border: 1px solid var(--border); border-radius: 6px;
-      background: transparent; color: var(--muted); cursor: pointer; text-align: center;
+      font-family: 'Geist', monospace;
+      font-size: 11px;
+      padding: 4px 8px;
+      border: 1px solid var(--success-border);
+      border-radius: 6px;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
       transition: all 0.12s;
     }
-    .p-btn:hover { border-color: var(--tx); color: var(--tx); }
+    .p-btn:hover { border-color: var(--border2); color: var(--tx); }
     .p-btn.active { background: var(--tx); color: var(--bg); border-color: var(--tx); }
 
-    .tab-section { }
-    .tab-lbl { font-size: 10px; font-weight: 600; color: var(--muted); letter-spacing: 0.6px; text-transform: uppercase; margin-bottom: 8px; }
+    /* ── Time stepper ── */
+    .stepper-wrap {
+      display: flex;
+      align-items: center;
+      margin-top: 8px;
+      border: 1px solid var(--success-border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .s-btn {
+      width: 36px; height: 34px;
+      background: var(--surface);
+      border: none;
+      color: var(--muted);
+      font-size: 18px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.1s, color 0.1s;
+      flex-shrink: 0;
+      user-select: none;
+    }
+    .s-btn:hover { background: var(--surface2); color: var(--tx); }
+    .s-btn:active { transform: scale(0.93); }
+    .s-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+    .time-display {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 1px;
+      background: var(--bg);
+      border-left: 1px solid var(--border);
+      border-right: 1px solid var(--border);
+      height: 34px;
+      user-select: none;
+    }
+    .time-part {
+      font-family: 'Geist', monospace;
+      font-size: 15px;
+      font-weight: 500;
+      color: var(--tx);
+      min-width: 20px;
+      text-align: right;
+    }
+    .time-unit {
+      font-size: 11px;
+      color: var(--muted);
+      margin-right: 3px;
+    }
+
+    .stepper-hint {
+      font-size: 10px;
+      color: var(--muted);
+      text-align: center;
+      margin-top: 5px;
+    }
+
+    /* ── Tab row ── */
     .tab-row {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 7px 10px; background: var(--surface); border-radius: 8px; margin-bottom: 5px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 10px;
+      background: var(--surface);
+      border-radius: 8px;
     }
-    .tab-name { font-size: 12px; color: var(--tx); max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .tab-badge { font-family: 'Geist', monospace; font-size: 10px; padding: 2px 7px; border-radius: 20px; }
-    .tab-badge.on  { background: var(--success-bg); color: var(--success); }
-    .tab-badge.off { background: var(--surface); color: var(--muted); border: 1px solid var(--border); }
+    .tab-name {
+      font-size: 12px;
+      color: var(--tx);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 155px;
+    }
+    .tab-badge {
+      font-family: 'Geist', monospace;
+      font-size: 10px;
+      padding: 2px 7px;
+      border-radius: 20px;
+      background: var(--surface2);
+      color: var(--muted);
+      border: 1px solid var(--success-border);
+      flex-shrink: 0;
+    }
+    .tab-badge.on {
+      background: var(--success-bg);
+      color: var(--success);
+      border-color: var(--success-border);
+    }
 
+    /* ── Action button ── */
     .action-btn {
-      width: 100%; padding: 8px 0; margin-top: 10px;
-      border: none; border-radius: 8px;
-      font-family: 'Geist', sans-serif; font-size: 13px; font-weight: 600;
-      cursor: pointer; transition: all 0.15s;
+      width: 100%;
+      padding: 8px 0;
+      border: 1px solid var(--success-border);
+      border-radius: 8px;
+      font-family: 'Geist', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+      background: var(--success-bg);
+      color: var(--success);
     }
-    .action-btn.primary {
-      background: var(--success); color: var(--bg);
-    }
-    .action-btn.secondary {
-      background: var(--surface); color: var(--tx);
-      border: 1px solid var(--border);
-    }
-    .action-btn:hover { opacity: 0.85; }
+    .action-btn:hover { opacity: 0.8; }
     .action-btn:active { transform: scale(0.97); }
-    .action-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .action-btn.stop {
+      border-color: var(--danger-border);
+      color: var(--danger);
+      background: var(--danger-bg);
+    }
+    .action-btn.stop:hover { background: rgba(220,38,38,0.08); }
 
+    /* ── Randomize row ── */
     .randomize-row {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 8px 0 0; font-size: 10px; color: var(--muted);
-      letter-spacing: 0.3px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--muted);
     }
-    .switch {
-      position: relative; width: 34px; height: 18px; flex-shrink: 0;
+    .mini-toggle { position: relative; width: 32px; height: 18px; cursor: pointer; }
+    .mini-toggle input { opacity: 0; width: 0; height: 0; position: absolute; }
+    .mini-slider {
+      position: absolute; inset: 0;
+      background: var(--border);
+      border-radius: 9px;
+      transition: background 0.25s;
     }
-    .switch input { opacity: 0; width: 0; height: 0; }
-    .slider {
-      position: absolute; cursor: pointer; inset: 0;
-      background: var(--border); border-radius: 18px; transition: 0.25s;
+    .mini-slider::before {
+      content: '';
+      position: absolute;
+      top: 2px; left: 2px;
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      background: var(--bg);
+      transition: transform 0.25s;
     }
-    .slider::before {
-      content: ""; position: absolute; height: 14px; width: 14px;
-      left: 2px; bottom: 2px; border-radius: 50%;
-      background: var(--bg); transition: transform 0.25s;
-    }
-    input:checked + .slider { background: var(--success); }
-    input:checked + .slider::before { transform: translateX(16px); }
+    input:checked + .mini-slider { background: var(--success); }
+    input:checked + .mini-slider::before { transform: translateX(14px); }
   </style>
-  
 </head>
 <body>
 
+  <!-- Header -->
   <div class="header">
     <div class="header-left">
-      <div class="icon-ring">
-        <svg id="spinIcon" class="spin-icon" width="16" height="16" viewBox="0 0 24 24"
-          fill="none" stroke="currentColor" stroke-width="2.2"
-          stroke-linecap="round" stroke-linejoin="round">
-          <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
-          <path d="M21 3v5h-5"/>
-          <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
-          <path d="M8 16H3v5"/>
-        </svg>
-      </div>
+      <div class="status-dot" id="statusDot"></div>
       <div>
         <div class="h-title">Auto Refresh</div>
         <div class="h-sub" id="hSub">inactive</div>
@@ -183,67 +304,72 @@
     </div>
   </div>
 
-  <div class="ring-wrap">
-    <svg width="100" height="100" viewBox="0 0 100 100">
-      <circle class="ring-track" cx="50" cy="50" r="40" fill="none" stroke-width="5"/>
-      <circle id="progressArc" class="ring-progress" cx="50" cy="50" r="40" fill="none"
-        stroke-width="5" stroke-linecap="round"
-        stroke-dasharray="251.2" stroke-dashoffset="251.2"
-        transform="rotate(-90 50 50)"/>
-      <text id="ringNum" class="ring-num" x="50" y="54" text-anchor="middle">—</text>
-      <text class="ring-sub" x="50" y="67" text-anchor="middle">next refresh</text>
-    </svg>
-  </div>
+  <div class="divider"></div>
 
-  <div class="stats-row">
-    <div class="stat-card">
-      <div class="stat-lbl">Interval</div>
-      <div class="stat-val" id="statInterval">1m</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-lbl">Refreshed</div>
-      <div class="stat-val" id="statCount">0</div>
+  <!-- Ring + stats -->
+  <div class="ring-section">
+    <svg width="72" height="72" viewBox="0 0 72 72" style="flex-shrink:0">
+      <circle class="ring-track" cx="36" cy="36" r="28" fill="none" stroke-width="4"/>
+      <circle id="progressArc" class="ring-progress" cx="36" cy="36" r="28" fill="none"
+        stroke-width="4" stroke-linecap="round"
+        stroke-dasharray="175.9" stroke-dashoffset="175.9"
+        transform="rotate(-90 36 36)"/>
+      <text id="ringNum" class="ring-num" x="36" y="40" text-anchor="middle">—</text>
+    </svg>
+    <div class="ring-stats">
+      <div class="stat-row">
+        <span class="stat-lbl">interval</span>
+        <span class="stat-val" id="statInterval">—</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-lbl">refreshed</span>
+        <span class="stat-val" id="statCount">0</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-lbl">next in</span>
+        <span class="stat-val" id="statNext">—</span>
+      </div>
     </div>
   </div>
 
   <div class="divider"></div>
 
-  <div class="interval-block">
-    <div class="interval-lbl">Set interval</div>
+  <!-- Interval section -->
+  <div>
+    <div class="section-label">interval</div>
     <div class="presets" id="presets">
       <button class="p-btn" data-v="60">1m</button>
       <button class="p-btn" data-v="120">2m</button>
       <button class="p-btn" data-v="300">5m</button>
-      <button class="p-btn active" data-v="600">10m</button>
+      <button class="p-btn" data-v="600">10m</button>
       <button class="p-btn" data-v="900">15m</button>
-      <button class="p-btn" data-v="1200">20m</button>
-      <button class="p-btn" data-v="1500">25m</button>
-      <button class="p-btn" data-v="1800">30m</button>
     </div>
-    <div class="stepper-row" style="margin-top:8px">
-      <button class="s-btn" id="stepDown">−</button>
-      <input type="number" class="s-input" id="customInterval" min="60" value="600" step="30">
-      <button class="s-btn" id="stepUp">+</button>
-      <span class="s-unit">sec</span>
+    <div class="stepper-wrap">
+      <button class="s-btn" id="stepDown" aria-label="Decrease interval">−</button>
+      <div class="time-display" id="timeDisplay">
+        <span class="time-part" id="timeMins">10</span><span class="time-unit">m</span><span class="time-part" id="timeSecs">00</span><span class="time-unit">s</span>
+      </div>
+      <button class="s-btn" id="stepUp" aria-label="Increase interval">+</button>
     </div>
+    <div class="stepper-hint">steps of 30s &nbsp;·&nbsp; min 1m &nbsp;·&nbsp; max 2h</div>
   </div>
 
-  <div class="tab-section">
-    <div class="tab-lbl">This tab</div>
+  <!-- Tab -->
+  <div>
+    <div class="section-label">this tab</div>
     <div class="tab-row">
       <span class="tab-name" id="tabName">current tab</span>
-      <span class="tab-badge" id="tabBadge" class="off">off</span>
+      <span class="tab-badge" id="tabBadge">off</span>
     </div>
   </div>
 
-  <!-- Single Start/Stop button — no pause -->
-  <button class="action-btn primary" id="actionBtn">Start</button>
+  <button class="action-btn" id="actionBtn">Start</button>
 
   <div class="randomize-row">
-    <span title="Each refresh picks a random interval within ±10% of the base">Randomize interval (±10%)</span>
-    <label class="switch">
+    <span title="Each refresh picks a random interval within ±30% of the base">Randomize interval</span>
+    <label class="mini-toggle">
       <input type="checkbox" id="randomizeToggle">
-      <span class="slider"></span>
+      <span class="mini-slider"></span>
     </label>
   </div>
 
