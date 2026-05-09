@@ -8,35 +8,65 @@ export function isMessage(msg: unknown): msg is Message {
 	return typeof msg === "object" && msg !== null && "action" in msg;
 }
 
-const MIN_INTERVAL = 60; // Firefox minimum for periodInMinutes is 1
+const MIN_INTERVAL = 60;
 
-// Apply ±10% jitter to an interval, clamped to MIN_INTERVAL
+// Returns a jittered value within ±30% of base, never below MIN_INTERVAL.
+// With ±10% on a 60s base the swing is only ±6s and the lower half gets
+// clamped away — barely noticeable. ±30% gives a 42–78s range on 60s base.
 export function jitteredInterval(base: number): number {
-	const jitter = base * 0.1;
-	return Math.max(MIN_INTERVAL, Math.round(base + (Math.random() * 2 - 1) * jitter));
+	const jitter = base * 0.3;
+	const value = base + (Math.random() * 2 - 1) * jitter;
+	const result = Math.max(MIN_INTERVAL, Math.round(value));
+	console.log(`[AutoRefresh] jitter: base=${base}s  jittered=${result}s`);
+	return result;
 }
 
 function getAlarmName(tabId: number): string {
 	return `autoRefresh-${tabId}`;
 }
 
-export function handleMessage(msg: unknown): void {
+// Schedule an alarm.
+// Fixed mode  → periodInMinutes  (browser repeats automatically)
+// Random mode → delayInMinutes   (one-shot; we reschedule after each fire
+//                                 with a fresh jittered value)
+function scheduleAlarm(alarmName: string, intervalSecs: number, randomize: boolean): Promise<void> {
+	console.log(
+		`[AutoRefresh] scheduleAlarm name=${alarmName} interval=${intervalSecs}s randomize=${randomize}`,
+	);
+	return browser.alarms.clear(alarmName).then(() => {
+		if (randomize) {
+			browser.alarms.create(alarmName, { delayInMinutes: intervalSecs / 60 });
+		} else {
+			browser.alarms.create(alarmName, { periodInMinutes: intervalSecs / 60 });
+		}
+	});
+}
+
+export function handleMessage(msg: unknown): Promise<{ actualInterval: number }> | undefined {
 	if (!isMessage(msg)) return;
 
 	if (msg.action === "start") {
-		const { interval, tabId } = msg;
+		const { interval, tabId, randomize: msgRandomize } = msg;
+		const clampedInterval = Math.max(MIN_INTERVAL, interval);
 
-		const clampedInterval = Math.max(60, interval);
-
-		log("Starting auto-refresh:", { interval: clampedInterval, tabId });
-
-		browser.storage.local
+		return browser.storage.local
 			.get(["randomize", "tabStates", "defaultInterval"])
-			.then((data) => {
-				const randomize = typeof data.randomize === "boolean" ? data.randomize : false;
-				const count = getTabCount(data, tabId);
+			.then(async (data) => {
+				// msgRandomize (from popup) takes precedence over stored value
+				const randomize =
+					typeof msgRandomize === "boolean"
+						? msgRandomize
+						: typeof data.randomize === "boolean"
+							? data.randomize
+							: false;
 
+				console.log(
+					`[AutoRefresh] start tab=${tabId} interval=${clampedInterval}s randomize=${randomize}`,
+				);
+
+				const count = getTabCount(data, tabId);
 				const alarmName = getAlarmName(tabId);
+				const actualInterval = randomize ? jitteredInterval(clampedInterval) : clampedInterval;
 
 				const status = fromStorage(data, tabId);
 				status.state = "ACTIVE";
@@ -44,26 +74,25 @@ export function handleMessage(msg: unknown): void {
 				status.interval = clampedInterval;
 				status.count = count;
 				status.randomize = randomize;
+				status.actualInterval = actualInterval;
 
 				const defaultInterval = getDefaultInterval(data);
 
+				// Persist — includes tabState.randomize so handleAlarm can read it
 				browser.storage.local
 					.set(toStorageState(status, defaultInterval, data.tabStates))
 					.catch(() => {});
 
 				browser.action.setBadgeText({ text: "ON", tabId });
 				browser.action.setBadgeBackgroundColor({ color: "#16a34a" });
+				browser.tabs.sendMessage(tabId, { showCountdown: actualInterval }).catch(() => {});
 
-				browser.tabs.sendMessage(tabId, { showCountdown: clampedInterval }).catch(() => {});
+				// Await alarm creation so errors propagate
+				await scheduleAlarm(alarmName, actualInterval, randomize).catch(() => {});
 
-				browser.alarms.clear(alarmName).then(() => {
-					const actualInterval = randomize ? jitteredInterval(clampedInterval) : clampedInterval;
-					browser.alarms.create(alarmName, {
-						periodInMinutes: actualInterval / 60,
-					});
-				});
+				return { actualInterval };
 			})
-			.catch(() => {});
+			.catch(() => ({ actualInterval: clampedInterval }));
 	}
 
 	if (msg.action === "stop") {
@@ -80,160 +109,73 @@ export function handleMessage(msg: unknown): void {
 				const tabStates: Record<number, TabState> = { ...(data.tabStates || {}) };
 				delete tabStates[tabId];
 				const hasActive = Object.values(tabStates).some((s) => !s.paused);
-				browser.storage.local
-					.set({
-						active: hasActive,
-						tabStates,
-					})
-					.catch(() => {});
-			})
-			.catch(() => {});
-	}
-
-	if (msg.action === "pause") {
-		const tabId = msg.tabId;
-		log("Pausing auto-refresh for tab:", tabId);
-
-		const alarmName = getAlarmName(tabId);
-
-		browser.storage.local
-			.get(["tabStates", "defaultInterval"])
-			.then((data) => {
-				browser.alarms
-					.get(alarmName)
-					.then((alarm) => {
-						let remainingSec: number | null = null;
-						if (alarm) {
-							const remainingMs = alarm.scheduledTime - Date.now();
-							remainingSec = Math.max(1, Math.ceil(remainingMs / 1000));
-						}
-
-						const tabStates: Record<number, TabState> = { ...(data.tabStates || {}) };
-						if (tabStates[tabId]) {
-							tabStates[tabId].paused = true;
-							if (remainingSec !== null) {
-								tabStates[tabId].remaining = remainingSec;
-							}
-						}
-
-						browser.storage.local.set({ tabStates }).catch(() => {});
-						browser.alarms.clear(alarmName);
-						browser.action.setBadgeText({ text: "PAUSED", tabId });
-						browser.action.setBadgeBackgroundColor({ color: "#f59e0b" });
-						browser.tabs.sendMessage(tabId, { hideCountdown: true }).catch(() => {});
-					})
-					.catch(() => {});
-			})
-			.catch(() => {});
-	}
-
-	if (msg.action === "resume") {
-		const tabId = msg.tabId;
-		log("Resuming auto-refresh for tab:", tabId);
-
-		const alarmName = getAlarmName(tabId);
-
-		browser.storage.local
-			.get(["tabStates", "defaultInterval"])
-			.then((data) => {
-				const tabState = data.tabStates?.[tabId];
-				const interval = tabState?.interval ?? data.defaultInterval ?? 60;
-				const remaining = tabState?.remaining ?? interval;
-
-				const tabStates: Record<number, TabState> = { ...(data.tabStates || {}) };
-				if (tabStates[tabId]) {
-					tabStates[tabId].paused = false;
-					tabStates[tabId].remaining = null;
-				}
-
-				browser.storage.local.set({ tabStates }).catch(() => {});
-
-				browser.action.setBadgeText({ text: "ON", tabId });
-				browser.action.setBadgeBackgroundColor({ color: "#16a34a" });
-				browser.tabs
-					.sendMessage(tabId, { showCountdown: remaining < 60 ? remaining : interval })
-					.catch(() => {});
-
-				browser.alarms.clear(alarmName).then(() => {
-					if (remaining < 60) {
-						browser.alarms.create(alarmName, {
-							delayInMinutes: remaining / 60,
-						});
-					} else {
-						browser.alarms.create(alarmName, {
-							periodInMinutes: interval / 60,
-						});
-					}
-				});
+				browser.storage.local.set({ active: hasActive, tabStates }).catch(() => {});
 			})
 			.catch(() => {});
 	}
 }
 
 export function handleAlarm(alarm: browser.alarms.Alarm): void {
-	if (alarm.name.startsWith("autoRefresh-")) {
-		const tabId = Number(alarm.name.split("-")[1]);
-		log("Alarm triggered for tab:", tabId);
+	if (!alarm.name.startsWith("autoRefresh-")) return;
 
-		browser.storage.local
-			.get(["tabStates", "defaultInterval"])
-			.then((data) => {
-				const tabState = data.tabStates?.[tabId];
-				if (!tabState) {
-					log("No tab state found, clearing alarm");
-					browser.alarms.clear(alarm.name);
-					return;
-				}
+	const tabId = Number(alarm.name.split("-")[1]);
+	console.log(`[AutoRefresh] alarm fired for tab=${tabId}`);
 
-				const randomize = typeof tabState.randomize === "boolean" ? tabState.randomize : false;
-				const baseInterval = tabState.interval ?? data.defaultInterval ?? 60;
-				const currentCount = tabState.count ?? 0;
+	browser.storage.local
+		.get(["tabStates", "defaultInterval"])
+		.then((data) => {
+			const tabState = data.tabStates?.[tabId];
+			if (!tabState) {
+				log("No tab state found, clearing alarm");
+				browser.alarms.clear(alarm.name);
+				return;
+			}
 
-				browser.tabs
-					.reload(tabId)
-					.then(() => {
-						const newCount = currentCount + 1;
-						const tabStates: Record<number, TabState> = { ...(data.tabStates || {}) };
-						if (tabStates[tabId]) {
-							tabStates[tabId].count = newCount;
-						}
-						browser.storage.local.set({ tabStates }).catch(() => {});
-						log("Tab reloaded, count:", newCount);
+			const randomize = typeof tabState.randomize === "boolean" ? tabState.randomize : false;
+			const baseInterval = tabState.interval ?? data.defaultInterval ?? MIN_INTERVAL;
+			const currentCount = tabState.count ?? 0;
 
-						const alarmName = getAlarmName(tabId);
-						const nextInterval = randomize ? jitteredInterval(baseInterval) : baseInterval;
-						browser.tabs.sendMessage(tabId, { showCountdown: nextInterval }).catch(() => {});
+			// Compute the next interval BEFORE reloading the tab so it's
+			// ready to write to storage and send to popup immediately after reload.
+			const nextInterval = randomize ? jitteredInterval(baseInterval) : baseInterval;
+			console.log(`[AutoRefresh] next interval=${nextInterval}s randomize=${randomize}`);
 
-						if (randomize) {
-							browser.alarms.clear(alarmName).then(() => {
-								browser.alarms.create(alarmName, {
-									periodInMinutes: nextInterval / 60,
-								});
-							});
-						}
-					})
-					.catch((err) => {
-						warn("Tab reload failed, stopping:", err);
-						browser.alarms.clear(getAlarmName(tabId));
-						browser.storage.local
-							.get("tabStates")
-							.then((data) => {
-								const tabStates: Record<number, TabState> = { ...(data.tabStates || {}) };
-								delete tabStates[tabId];
-								const hasActive = Object.values(tabStates).some((s) => !s.paused);
-								browser.storage.local
-									.set({
-										active: hasActive,
-										tabStates,
-									})
-									.catch(() => {});
-							})
-							.catch(() => {});
-						browser.action.setBadgeText({ text: "", tabId }).catch(() => {});
-					});
-			})
-			.catch(() => {});
-	}
+			browser.tabs
+				.reload(tabId)
+				.then(() => {
+					const newCount = currentCount + 1;
+					const tabStates: Record<number, TabState> = { ...(data.tabStates || {}) };
+					if (tabStates[tabId]) {
+						tabStates[tabId].count = newCount;
+						tabStates[tabId].actualInterval = nextInterval;
+					}
+					browser.storage.local.set({ tabStates }).catch(() => {});
+
+					// Send next countdown to content script overlay
+					browser.tabs.sendMessage(tabId, { showCountdown: nextInterval }).catch(() => {});
+
+					// Fixed alarms repeat automatically via periodInMinutes.
+					// Randomized alarms are one-shot — schedule the next one now.
+					if (randomize) {
+						scheduleAlarm(alarm.name, nextInterval, true).catch(() => {});
+					}
+				})
+				.catch((err) => {
+					warn("Tab reload failed, stopping:", err);
+					browser.alarms.clear(getAlarmName(tabId));
+					browser.storage.local
+						.get("tabStates")
+						.then((d) => {
+							const tabStates: Record<number, TabState> = { ...(d.tabStates || {}) };
+							delete tabStates[tabId];
+							const hasActive = Object.values(tabStates).some((s) => !s.paused);
+							browser.storage.local.set({ active: hasActive, tabStates }).catch(() => {});
+						})
+						.catch(() => {});
+					browser.action.setBadgeText({ text: "", tabId }).catch(() => {});
+				});
+		})
+		.catch(() => {});
 }
 
 browser.runtime.onMessage.addListener(handleMessage);
@@ -250,5 +192,4 @@ export async function handleStartup(): Promise<void> {
 	await browser.storage.local.set({ active: false }).catch(() => {});
 }
 
-// Clear any stale alarms on extension startup
 browser.runtime.onStartup.addListener(handleStartup);

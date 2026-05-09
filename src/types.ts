@@ -1,5 +1,5 @@
 export type Message =
-	| { action: "start"; interval: number; tabId: number }
+	| { action: "start"; interval: number; tabId: number; randomize?: boolean }
 	| { action: "stop"; tabId: number }
 	| { action: "pause"; tabId: number }
 	| { action: "resume"; tabId: number };
@@ -10,6 +10,7 @@ export interface TabState {
 	paused: boolean;
 	remaining: number | null;
 	randomize: boolean;
+	actualInterval?: number;
 }
 
 export interface StorageState {

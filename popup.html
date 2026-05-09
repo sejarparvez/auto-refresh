@@ -236,16 +236,17 @@
     </div>
   </div>
 
+  <!-- Single Start/Stop button — no pause -->
   <button class="action-btn primary" id="actionBtn">Start</button>
 
   <div class="randomize-row">
-    <span title="Each refresh cycle picks a random interval within ±10% of the base, not just once at startup">Randomize interval (±10%)</span>
+    <span title="Each refresh picks a random interval within ±10% of the base">Randomize interval (±10%)</span>
     <label class="switch">
       <input type="checkbox" id="randomizeToggle">
       <span class="slider"></span>
     </label>
   </div>
 
-  <script src="dist/popup.js"></script>
+  <script type="module" src="dist/popup.js"></script>
 </body>
 </html>

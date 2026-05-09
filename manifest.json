@@ -41,13 +41,13 @@
 		"extension_pages": "script-src 'self'; object-src 'self'; font-src 'self'"
 	},
 	"background": {
-		"scripts": ["background.js"],
+		"scripts": ["dist/background.js"],
 		"type": "module"
 	},
 	"content_scripts": [
 		{
 			"matches": ["<all_urls>"],
-			"js": ["content.js"],
+			"js": ["dist/content.js"],
 			"run_at": "document_idle"
 		}
 	]

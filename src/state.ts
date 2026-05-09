@@ -9,6 +9,7 @@ export interface RefreshStatus {
 	count: number;
 	remaining: number | null;
 	randomize: boolean;
+	actualInterval?: number;
 }
 
 export function isActive(status: RefreshStatus): boolean {
@@ -37,6 +38,7 @@ export function toStorageState(
 			paused: status.state === "PAUSED",
 			remaining: status.remaining,
 			randomize: status.randomize,
+			...(status.actualInterval !== undefined ? { actualInterval: status.actualInterval } : {}),
 		};
 	}
 
@@ -73,6 +75,7 @@ export function fromStorage(data: Partial<StorageState>, tabId: number | null): 
 		count: tabState?.count ?? 0,
 		remaining: tabState?.remaining ?? null,
 		randomize: tabState?.randomize ?? false,
+		actualInterval: tabState?.actualInterval,
 	};
 }
 
