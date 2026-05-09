@@ -10,6 +10,7 @@
 		"typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.build.json",
 		"test": "bun test",
 		"version:bump": "bun run scripts/version-bump.ts",
+		"release": "bun run scripts/release.ts",
 		"lint": "bunx biome lint ./src",
 		"format": "bunx biome format --write ./src",
 		"check": "bunx biome check ./src"
