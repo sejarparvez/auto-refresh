@@ -21,6 +21,7 @@ const mockTabs = {
 	sendMessage: mock(() => Promise.resolve()),
 };
 const mockRuntime = { onStartup: { addListener: mock() }, onMessage: { addListener: mock() } };
+const mockCommands = { onCommand: { addListener: mock() } };
 
 function clearAllMocks() {
 	for (const m of [
@@ -46,6 +47,7 @@ beforeEach(() => {
 		action: mockAction,
 		tabs: mockTabs,
 		runtime: mockRuntime,
+		commands: mockCommands,
 	};
 	clearAllMocks();
 });

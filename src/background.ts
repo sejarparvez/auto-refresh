@@ -193,3 +193,23 @@ export async function handleStartup(): Promise<void> {
 }
 
 browser.runtime.onStartup.addListener(handleStartup);
+
+browser.commands.onCommand.addListener((command) => {
+	if (command !== "toggle-refresh") return;
+	browser.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
+		if (!tab?.id) return;
+		browser.storage.local.get(["tabStates", "defaultInterval", "randomize"]).then((data) => {
+			const isActive = data.active === true && data.currentTabId === tab.id;
+			if (isActive) {
+				handleMessage({ action: "stop", tabId: tab.id });
+			} else {
+				handleMessage({
+					action: "start",
+					interval: data.defaultInterval ?? MIN_INTERVAL,
+					tabId: tab.id,
+					randomize: data.randomize ?? false,
+				});
+			}
+		});
+	});
+});

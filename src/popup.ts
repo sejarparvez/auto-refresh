@@ -344,10 +344,6 @@ randomizeToggle.addEventListener("change", async () => {
 	}
 });
 
-browser.commands?.onCommand.addListener((command) => {
-	if (command === "toggle-refresh") handleToggle();
-});
-
 // ─── Restore state on popup open ──────────────────────────────────────────────
 
 (async () => {

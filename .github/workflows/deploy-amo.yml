@@ -43,6 +43,7 @@ jobs:
           cp manifest.json popup.html dist-package/
           cp -r icons/ fonts/ dist-package/
           sed -i 's|"dist/background\.js"|"background.js"|g; s|"dist/content\.js"|"content.js"|g' dist-package/manifest.json
+          sed -i 's|src="dist/popup.js"|src="popup.js"|g' dist-package/popup.html
           cd dist-package && zip -r ../auto-refresh-${{ github.event.release.tag_name }}.zip .
 
       - name: Upload release asset

@@ -31,6 +31,10 @@ const mockRuntime = {
 	onMessage: { addListener: mock() },
 };
 
+const mockCommands = {
+	onCommand: { addListener: mock() },
+};
+
 function setupBrowserMock() {
 	globalThis.browser = {
 		alarms: mockAlarms,
@@ -38,6 +42,7 @@ function setupBrowserMock() {
 		action: mockAction,
 		tabs: mockTabs,
 		runtime: mockRuntime,
+		commands: mockCommands,
 	};
 }
 
