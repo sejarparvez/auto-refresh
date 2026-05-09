@@ -21,12 +21,7 @@
 	"browser_specific_settings": {
 		"gecko": {
 			"id": "auto-refresh@sejarparvez",
-			"strict_min_version": "140.0",
-			"data_collection_permissions": {
-				"required": [
-					"none"
-				]
-			}
+			"strict_min_version": "140.0"
 		}
 	},
 	"icons": {
