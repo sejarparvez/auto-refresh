@@ -1,0 +1,25 @@
+changelog:
+  categories:
+    - title: "🚀 New features"
+      labels:
+        - feature
+        - enhancement
+    - title: "🐛 Bug fixes"
+      labels:
+        - fix
+        - bug
+    - title: "🎨 UI / Design"
+      labels:
+        - ui
+        - design
+    - title: "⚡ Performance"
+      labels:
+        - performance
+    - title: "🔧 Maintenance"
+      labels:
+        - chore
+        - ci
+        - dependencies
+    - title: "Other changes"
+      labels:
+        - "*"
