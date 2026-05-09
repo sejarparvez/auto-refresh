@@ -5,6 +5,12 @@ All notable changes to the Auto Refresh Tab extension will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.3] - 2026-05-09
+
+### Fixed
+- Popup JavaScript not loading in signed AMO builds (popup.html script path not updated during packaging)
+- Keyboard shortcut (Alt+R) not working — listener moved from ephemeral popup to persistent background script
+
 ## [1.3.2] - 2026-05-09
 
 ### Fixed
